@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lagos Gas Emissions Analytics</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    body {
+      background: var(--bg-color);
+      color: var(--text-primary);
+      margin: 0;
+      font-family: 'Inter', sans-serif;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      height: 100vh;
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+
+    .dashboard-container {
+      padding: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      max-width: 1400px;
+      margin: 0 auto;
+      width: 100%;
+      box-sizing: border-box;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    h1.dash-title {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    /* Top Row KPIs */
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr));
+      gap: 8px;
+    }
+
+    .kpi-card {
+      background: var(--card-bg);
+      padding: 10px;
+      border-radius: 12px;
+      box-shadow: var(--shadow-md);
+      border: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: background-color 0.3s ease, border-color 0.3s ease;
+    }
+
+    .kpi-title {
+      font-size: 10px;
+      color: var(--text-secondary);
+      font-weight: 600;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .kpi-value {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .kpi-subtext {
+      font-size: 11px;
+      color: var(--success-color);
+      margin-top: 2px;
+      font-weight: 500;
+    }
+
+    .kpi-subtext.negative {
+      color: var(--danger-color);
+    }
+
+    .kpi-subtext.neutral {
+      color: var(--text-secondary);
+    }
+
+    /* Map Section */
+    .map-section {
+      display: flex;
+      flex-direction: column;
+      background: var(--card-bg);
+      border-radius: 12px;
+      box-shadow: var(--shadow-md);
+      border: 1px solid var(--border-color);
+      overflow: hidden;
+      gap: 0;
+      transition: background-color 0.3s ease, border-color 0.3s ease;
+    }
+
+    .map-header {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 8px 10px;
+      background: var(--bg-color);
+      border-bottom: 1px solid var(--border-color);
+      align-items: center;
+      justify-content: space-between;
+      transition: background-color 0.3s ease, border-color 0.3s ease;
+    }
+
+    .map-filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .control {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .control label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .control select {
+      padding: 4px 8px;
+      border-radius: 4px;
+      border: 1px solid var(--border-color);
+      background: var(--card-bg);
+      font-family: 'Inter';
+      font-size: 12px;
+      outline: none;
+      cursor: pointer;
+      color: var(--text-primary);
+      transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+    }
+
+    .control select:focus {
+      border-color: var(--accent-color);
+      box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.1);
+    }
+
+    .map-body {
+      display: flex;
+      width: 100%;
+      height: 15vh;
+      min-height: 120px;
+      position: relative;
+    }
+
+    .map-container {
+      flex: 1;
+      position: relative;
+      border-right: 1px solid var(--border-color);
+    }
+
+    .map-container:last-child {
+      border-right: none;
+    }
+
+    .map-title-overlay {
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255, 255, 255, 0.95);
+      padding: 6px 16px;
+      border-radius: 20px;
+      z-index: 1000;
+      font-size: 14px;
+      font-weight: 600;
+      box-shadow: var(--shadow-md);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+    }
+
+    #map,
+    #compareMap {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Legends */
+    .legend {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      z-index: 1000;
+      background: rgba(255, 255, 255, 0.95);
+      padding: 12px;
+      border-radius: 8px;
+      box-shadow: var(--shadow-lg);
+      font-size: 12px;
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+    }
+
+    .legend strong {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 13px;
+    }
+
+    .legend div {
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+    }
+
+    .legend span {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      margin-right: 8px;
+      border-radius: 4px;
+      border: 1px solid rgba(0, 0, 0, 0.1);
+    }
+
+    /* Bottom Charts */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+
+    .chart-card {
+      background: var(--card-bg);
+      border-radius: 8px;
+      padding: 8px;
+      box-shadow: var(--shadow-md);
+      border: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      min-height: 140px;
+      transition: background-color 0.3s ease, border-color 0.3s ease;
+    }
+
+    .chart-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+
+    .chart-header h3 {
+      margin: 0;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .chart-utils button {
+      background: none;
+      border: none;
+      font-size: 16px;
+      cursor: pointer;
+      color: #6b7280;
+      padding: 4px;
+      border-radius: 4px;
+      transition: background 0.2s;
+      outline: none;
+    }
+
+    .theme-toggle-card {
+      background: var(--card-bg);
+      padding: 10px;
+      border-radius: 12px;
+      box-shadow: var(--shadow-md);
+      border: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background-color 0.3s ease, border-color 0.3s ease;
+    }
+
+    .theme-toggle-btn {
+      background: none;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-primary);
+      transition: all 0.3s ease;
+      outline: none;
+    }
+
+    .theme-toggle-btn:hover {
+      background: var(--bg-color);
+    }
+
+    .theme-icon {
+      font-size: 16px;
+      transition: transform 0.3s ease;
+    }
+
+    .theme-text {
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    [data-theme="dark"] .theme-icon {
+      content: "☀️";
+    }
+
+    [data-theme="dark"] .theme-text {
+      content: "Light";
+    }
+
+    @media (max-width: 768px) {
+      .dashboard-container {
+        padding: 12px;
+        gap: 16px;
+      }
+
+      .map-body {
+        flex-direction: column;
+        min-height: 600px;
+        height: auto;
+      }
+
+      .map-container {
+        border-right: none;
+        border-bottom: 1px solid #e5e7eb;
+        min-height: 300px;
+      }
+
+      body {
+        height: auto;
+        min-height: 100vh;
+      }
+
+      h1.dash-title {
+        font-size: 20px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="dashboard-container">
+    <h1 class="dash-title">Lagos Gas Emissions Analytics</h1>
+
+    <header class="kpi-row">
+      <div class="kpi-card">
+        <div class="kpi-title">Total Active Sites</div>
+        <div class="kpi-value" id="kpi-sites">-</div>
+        <div class="kpi-subtext neutral">Measurement Locations</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-title">Highest Emitting LGA</div>
+        <div class="kpi-value" id="kpi-high-lga">-</div>
+        <div class="kpi-subtext negative" id="kpi-high-val">-</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-title">Lowest Emitting LGA</div>
+        <div class="kpi-value" id="kpi-low-lga">-</div>
+        <div class="kpi-subtext" id="kpi-low-val">-</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-title">Year-on-Year Trend</div>
+        <div class="kpi-value" id="kpi-yoy">-</div>
+        <div class="kpi-subtext neutral" id="kpi-yoy-sub">Vs Previous Year</div>
+      </div>
+      <div class="theme-toggle-card">
+        <button id="themeToggle" class="theme-toggle-btn" title="Toggle Dark/Light Mode">
+          <span class="theme-icon">🌙</span>
+          <span class="theme-text">Dark</span>
+        </button>
+      </div>
+    </header>
+
+    <main class="map-section">
+      <div class="map-header">
+        <div class="map-filters">
+          <div class="control">
+            <label>Metric:</label>
+            <select id="metricSelect">
+              <option value="ch4">Methane (CH4)</option>
+              <option value="co">Carbon Monoxide (CO)</option>
+              <option value="no2">Nitrogen Dioxide (NO2)</option>
+              <option value="isi">Impact Severity Index</option>
+              <option value="hotspots">Hotspot score</option>
+            </select>
+          </div>
+          <div class="control">
+            <label>Year:</label>
+            <select id="yearSelect"></select>
+          </div>
+          <div class="control">
+            <label>Compare With:</label>
+            <select id="compareYearSelect">
+              <option value="none">None</option>
+            </select>
+          </div>
+          <div class="control">
+            <label>Base Map:</label>
+            <select id="baseMapSelect">
+              <option value="osm">OpenStreetMap</option>
+              <option value="light">Carto Light</option>
+              <option value="satellite">Satellite Imagery</option>
+            </select>
+          </div>
+        </div>
+        <div class="control">
+          <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+            <input type="checkbox" id="pointToggle" checked /> Show Measurement Points
+          </label>
+        </div>
+      </div>
+      <div class="map-body">
+        <div class="map-container" id="map1Container">
+          <div class="map-title-overlay" id="map1Title">Primary Year</div>
+          <div id="map"></div>
+          <div class="legend" id="legend1"></div>
+        </div>
+        <div class="map-container" id="compareContainer" style="display:none;">
+          <div class="map-title-overlay" id="map2Title">Compared Year</div>
+          <div id="compareMap"></div>
+          <div class="legend" id="legend2"></div>
+        </div>
+      </div>
+    </main>
+
+    <section class="charts-grid">
+      <div class="chart-card">
+        <div class="chart-header">
+          <h3>Comparative Analysis (Bar)</h3>
+          <div class="chart-utils"><button title="Download PNG" onclick="downloadChart('barChart')">💾</button></div>
+        </div>
+        <div class="canvas-wrapper"><canvas id="barChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-header">
+          <h3>Trend Variability (Line)</h3>
+          <div class="chart-utils"><button title="Download PNG" onclick="downloadChart('lineChart')">💾</button></div>
+        </div>
+        <div class="canvas-wrapper"><canvas id="lineChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-header">
+          <h3>Variables Overview (Polar)</h3>
+          <div class="chart-utils"><button title="Download PNG" onclick="downloadChart('polarAreaChart')">💾</button>
+          </div>
+        </div>
+        <div class="canvas-wrapper"><canvas id="polarAreaChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-header">
+          <h3>Proportional Distribution (Doughnut)</h3>
+          <div class="chart-utils"><button title="Download PNG" onclick="downloadChart('doughnutChart')">💾</button>
+          </div>
+        </div>
+        <div class="canvas-wrapper"><canvas id="doughnutChart"></canvas></div>
+      </div>
+    </section>
+  </div>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    const YEAR_OPTIONS = ["2020", "2021", "2022", "2023", "2024", "2025"];
+    const METRIC_LABELS = {
+      ch4: "Methane (CH4)",
+      co: "Carbon Monoxide (CO)",
+      no2: "Nitrogen Dioxide (NO2)",
+      isi: "Impact Severity Index",
+      hotspots: "Hotspot score"
+    };
+    const METRIC_FORMATTERS = {
+      ch4: value => value === null ? "N/A" : value.toFixed(2),
+      co: value => value === null ? "N/A" : value.toFixed(3),
+      no2: value => value === null ? "N/A" : value.toExponential(2),
+      isi: value => value === null ? "N/A" : value.toFixed(2),
+      hotspots: value => value === null ? "N/A" : value.toFixed(2)
+    };
+
+    // Distinct LGA colors
+    const LGA_COLORS = [
+      "#ef4444", "#f97316", "#eab308", "#84cc16", "#22c55e",
+      "#14b8a6", "#06b6d4", "#0ea5e9", "#3b82f6", "#6366f1",
+      "#8b5cf6", "#a855f7", "#d946ef", "#ec4899", "#f43f5e",
+      "#9f1239", "#9a3412", "#3f6212", "#115e59", "#1e3a8a"
+    ];
+
+    let selectedYear = YEAR_OPTIONS[YEAR_OPTIONS.length - 1];
+    let compareYear = "none";
+    let selectedMetric = "ch4";
+
+    // Theme management
+    let currentTheme = localStorage.getItem('theme') || 'light';
+
+    function setTheme(theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+      localStorage.setItem('theme', theme);
+      currentTheme = theme;
+      
+      const themeBtn = document.getElementById('themeToggle');
+      const themeIcon = themeBtn.querySelector('.theme-icon');
+      const themeText = themeBtn.querySelector('.theme-text');
+      
+      if (theme === 'dark') {
+        themeIcon.textContent = '☀️';
+        themeText.textContent = 'Light';
+      } else {
+        themeIcon.textContent = '🌙';
+        themeText.textContent = 'Dark';
+      }
+    }
+
+    function toggleTheme() {
+      const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+      setTheme(newTheme);
+    }
+
+    // Initialize theme
+    setTheme(currentTheme);
+    let geojsonData = null;
+    let pointData = null;
+
+    // Layers and Maps
+    let emissionLayer = null;
+    let pointLayer = null;
+    let compareEmissionLayer = null;
+    let comparePointLayer = null;
+
+    let charts = {};
+    let mapBreaks = [0, 1, 2, 3, 4, 5];
+    let compareMapBreaks = [0, 1, 2, 3, 4, 5];
+
+    // Initialize Maps
+    const map = L.map('map').setView([6.5, 3.3], 10);
+    const compareMap = L.map('compareMap').setView([6.5, 3.3], 10);
+
+    // Sync Maps
+    map.on('move', () => { compareMap.setView(map.getCenter(), map.getZoom(), { animate: false }); });
+    compareMap.on('move', () => { map.setView(compareMap.getCenter(), compareMap.getZoom(), { animate: false }); });
+
+    const baseMapsConfig = {
+      osm: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      light: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+      satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+    };
+
+    let currentMapTile = L.tileLayer(baseMapsConfig.osm).addTo(map);
+    let currentCompareTile = L.tileLayer(baseMapsConfig.osm).addTo(compareMap);
+
+    function createColorScale(values) {
+      const valid = values.filter(v => typeof v === 'number');
+      if (!valid.length) return [0, 0, 0, 0, 0, 0];
+      const min = Math.min(...valid);
+      const max = Math.max(...valid);
+      const step = (max - min) / 5 || 1;
+      return [min, min + step, min + 2 * step, min + 3 * step, min + 4 * step, max];
+    }
+
+    function getColor(value, breaks) {
+      if (value === null || value === undefined || isNaN(value)) return '#facc15'; // yellowish fallback instead of gray
+      const [a, b, c, d, e, f] = breaks;
+      return value > e ? '#800026' : value > d ? '#BD0026' : value > c ? '#E31A1C' : value > b ? '#FC4E2A' : value > a ? '#FD8D3C' : '#FED976';
+    }
+
+    function buildLegend(containerId, breaks, targetYear) {
+      const legend = document.getElementById(containerId);
+      legend.innerHTML = `<strong>${METRIC_LABELS[selectedMetric]} (${targetYear})</strong>`;
+      const ranges = breaks;
+      const colors = ['#FED976', '#FD8D3C', '#FC4E2A', '#E31A1C', '#BD0026', '#800026'];
+      const format = METRIC_FORMATTERS[selectedMetric];
+      for (let i = 0; i < colors.length; i++) {
+        const from = ranges[i] !== undefined && ranges[i] !== null ? format(ranges[i]) : format(0);
+        const to = i < colors.length - 1 && ranges[i + 1] !== undefined && ranges[i + 1] !== null ? format(ranges[i + 1]) : `${from}+`;
+        legend.innerHTML += `<div><span style="background:${colors[i]}"></span>${from} ${i < colors.length - 1 ? '– ' + to : 'and above'}</div>`;
+      }
+    }
+
+    function styleFeature(feature, year, breaks) {
+      const value = feature.properties[`${selectedMetric}_${year}`];
+      return {
+        fillColor: getColor(value, breaks),
+        weight: 1, color: '#fff', fillOpacity: 0.7,
+      };
+    }
+
+    function updateKPIs() {
+      if (!geojsonData || !pointData) return;
+      // Total Sites
+      const validPoints = pointData.features.filter(f => f.properties.year === selectedYear);
+      document.getElementById('kpi-sites').innerText = validPoints.length;
+
+      // High / Low
+      const vals = geojsonData.features.map(f => ({ name: f.properties.lganame, val: f.properties[`${selectedMetric}_${selectedYear}`] }));
+      const validVals = vals.filter(v => typeof v.val === 'number' && !isNaN(v.val));
+      if (validVals.length > 0) {
+        validVals.sort((a, b) => b.val - a.val);
+        const high = validVals[0];
+        const low = validVals[validVals.length - 1];
+
+        document.getElementById('kpi-high-lga').innerText = high.name;
+        document.getElementById('kpi-high-val').innerText = METRIC_FORMATTERS[selectedMetric](high.val);
+
+        document.getElementById('kpi-low-lga').innerText = low.name;
+        document.getElementById('kpi-low-val').innerText = METRIC_FORMATTERS[selectedMetric](low.val);
+      } else {
+        document.getElementById('kpi-high-lga').innerText = "N/A";
+        document.getElementById('kpi-high-val').innerText = "";
+        document.getElementById('kpi-low-lga').innerText = "N/A";
+        document.getElementById('kpi-low-val').innerText = "";
+      }
+
+      // YoY Change
+      const idx = YEAR_OPTIONS.indexOf(selectedYear);
+      if (idx > 0) {
+        const prevYear = YEAR_OPTIONS[idx - 1];
+        const curSum = validVals.reduce((acc, curr) => acc + curr.val, 0);
+        const prevVals = geojsonData.features.map(f => f.properties[`${selectedMetric}_${prevYear}`]).filter(v => typeof v === 'number');
+        const prevSum = prevVals.reduce((acc, curr) => acc + curr, 0);
+
+        if (prevSum > 0) {
+          const pct = ((curSum - prevSum) / prevSum) * 100;
+          const el = document.getElementById('kpi-yoy');
+          const subEl = document.getElementById('kpi-yoy-sub');
+          el.innerText = `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%`;
+          el.style.color = pct > 0 ? '#ef4444' : '#10b981'; // In emissions, positive is usually bad (red)
+          subEl.innerText = `Vs ${prevYear}`;
+        } else {
+          document.getElementById('kpi-yoy').innerText = "N/A";
+          document.getElementById('kpi-yoy-sub').innerText = `Vs ${prevYear} (No Data)`;
+        }
+      } else {
+        document.getElementById('kpi-yoy').innerText = "N/A";
+        document.getElementById('kpi-yoy-sub').innerText = "No Previous Year";
+      }
+    }
+
+    function updateLayers() {
+      if (!geojsonData) return;
+      document.getElementById('map1Title').innerText = `${selectedYear}`;
+
+      // Update Primary Map
+      const values1 = geojsonData.features.map(f => f.properties[`${selectedMetric}_${selectedYear}`]).filter(v => typeof v === 'number');
+      mapBreaks = createColorScale(values1);
+      buildLegend('legend1', mapBreaks, selectedYear);
+
+      if (emissionLayer) emissionLayer.clearLayers();
+      emissionLayer = L.geoJSON(geojsonData, {
+        style: f => styleFeature(f, selectedYear, mapBreaks),
+        onEachFeature: function (feature, layer) {
+          const val = feature.properties[`${selectedMetric}_${selectedYear}`];
+          layer.bindTooltip(`<strong>${feature.properties.lganame}</strong><br>${METRIC_LABELS[selectedMetric]}: ${METRIC_FORMATTERS[selectedMetric](val)}`, {sticky: true});
+          layer.on({
+            mouseover: e => { 
+              e.target.setStyle({ weight: 3, color: '#fff', fillOpacity: 0.9 }); 
+              e.target.bringToFront(); 
+              if (pointLayer) pointLayer.bringToFront();
+            },
+            mouseout: e => { 
+              emissionLayer.resetStyle(e.target);
+            }
+          });
+        }
+      }).addTo(map);
+
+      // Update Compare Map
+      const compareContainer = document.getElementById('compareContainer');
+      if (compareYear !== "none") {
+        compareContainer.style.display = 'block';
+        document.getElementById('map2Title').innerText = `${compareYear}`;
+
+        const values2 = geojsonData.features.map(f => f.properties[`${selectedMetric}_${compareYear}`]).filter(v => typeof v === 'number');
+        compareMapBreaks = createColorScale(values2);
+        buildLegend('legend2', compareMapBreaks, compareYear);
+
+        if (compareEmissionLayer) compareEmissionLayer.clearLayers();
+        compareEmissionLayer = L.geoJSON(geojsonData, {
+          style: f => styleFeature(f, compareYear, compareMapBreaks),
+          onEachFeature: function (feature, layer) {
+            const val = feature.properties[`${selectedMetric}_${compareYear}`];
+            layer.bindTooltip(`<strong>${feature.properties.lganame}</strong><br>${METRIC_LABELS[selectedMetric]}: ${METRIC_FORMATTERS[selectedMetric](val)}`, {sticky: true});
+            layer.on({
+              mouseover: e => { 
+                e.target.setStyle({ weight: 3, color: '#fff', fillOpacity: 0.9 }); 
+                e.target.bringToFront(); 
+                if (comparePointLayer) comparePointLayer.bringToFront();
+              },
+              mouseout: e => { 
+                compareEmissionLayer.resetStyle(e.target);
+              }
+            });
+          }
+        }).addTo(compareMap);
+
+        compareMap.invalidateSize();
+      } else {
+        compareContainer.style.display = 'none';
+        if (compareEmissionLayer) compareEmissionLayer.clearLayers();
+        if (comparePointLayer) comparePointLayer.clearLayers();
+      }
+      map.invalidateSize();
+      updateKPIs();
+    }
+
+    function updatePoints() {
+      if (!pointData) return;
+      const show = document.getElementById('pointToggle').checked;
+
+      // Primary Map Points
+      if (pointLayer) pointLayer.clearLayers();
+      if (show) {
+        const filtered = { type: 'FeatureCollection', features: pointData.features.filter(f => f.properties.year === selectedYear) };
+        pointLayer = L.geoJSON(filtered, {
+          pointToLayer: (f, latlng) => L.circleMarker(latlng, { radius: 6, fillColor: '#1e3a8a', color: '#fff', weight: 1.5, fillOpacity: 0.85 }),
+          onEachFeature: (f, layer) => layer.bindPopup(`<strong>${f.properties.lganame}</strong>`)
+        }).addTo(map);
+      }
+
+      // Compare Map Points
+      if (comparePointLayer) comparePointLayer.clearLayers();
+      if (show && compareYear !== "none") {
+        const filteredComp = { type: 'FeatureCollection', features: pointData.features.filter(f => f.properties.year === compareYear) };
+        comparePointLayer = L.geoJSON(filteredComp, {
+          pointToLayer: (f, latlng) => L.circleMarker(latlng, { radius: 6, fillColor: '#1e3a8a', color: '#fff', weight: 1.5, fillOpacity: 0.85 }),
+          onEachFeature: (f, layer) => layer.bindPopup(`<strong>${f.properties.lganame}</strong>`)
+        }).addTo(compareMap);
+      }
+    }
+
+    function updateCharts() {
+      if (!geojsonData) return;
+      const features = geojsonData.features;
+      const labels = features.map(f => f.properties.lganame);
+      const data = features.map(f => f.properties[`${selectedMetric}_${selectedYear}`]);
+      const bgColors = features.map((_, i) => LGA_COLORS[i % LGA_COLORS.length]);
+
+      const datasets = [{
+        label: `${selectedYear}`,
+        data,
+        backgroundColor: bgColors,
+        borderColor: '#fff',
+        borderWidth: 1
+      }];
+
+      if (compareYear !== "none") {
+        const compareData = features.map(f => f.properties[`${selectedMetric}_${compareYear}`]);
+        const compareColors = bgColors.map(c => c + '40'); // apply transparency
+        datasets.push({
+          label: `${compareYear}`,
+          data: compareData,
+          backgroundColor: compareColors,
+          borderColor: bgColors,
+          borderWidth: 2
+        });
+      }
+
+      const chartData = { labels, datasets };
+      const chartTypes = ['bar', 'line', 'polarArea', 'doughnut'];
+
+      chartTypes.forEach(type => {
+        let scales = {};
+        let displayLegend = false;
+
+        if (type === 'polarArea' || type === 'doughnut') {
+          // Doughnuts/polars automatically map legend to array elements inside single dataset
+          displayLegend = true;
+        } else if (compareYear !== "none") {
+          displayLegend = true; // Show legend indicating years in bar/line chart
+        }
+
+        if (type === 'bar' || type === 'line') {
+          scales = {
+            y: { beginAtZero: true, title: { display: true, text: METRIC_LABELS[selectedMetric] } },
+            x: { title: { display: false, text: 'LGA' }, ticks: { autoSkip: false, maxRotation: 90, minRotation: 45 } }
+          };
+        }
+
+        const config = {
+          type: type,
+          data: JSON.parse(JSON.stringify(chartData)),
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales,
+            plugins: {
+              legend: { display: displayLegend, position: 'right' }
+            }
+          }
+        };
+
+        if (charts[type]) charts[type].destroy();
+        const ctx = document.getElementById(type + 'Chart').getContext('2d');
+        charts[type] = new Chart(ctx, config);
+      });
+    }
+
+    function initSelectors() {
+      const yearSelect = document.getElementById('yearSelect');
+      const compareYearSelect = document.getElementById('compareYearSelect');
+      YEAR_OPTIONS.forEach(year => {
+        const opt1 = document.createElement('option');
+        opt1.value = year; opt1.text = year; yearSelect.appendChild(opt1);
+        const opt2 = document.createElement('option');
+        opt2.value = year; opt2.text = year; compareYearSelect.appendChild(opt2);
+      });
+      yearSelect.value = selectedYear;
+
+      yearSelect.addEventListener('change', e => { selectedYear = e.target.value; triggerUpdate(); });
+      compareYearSelect.addEventListener('change', e => { compareYear = e.target.value; triggerUpdate(); });
+
+      document.getElementById('metricSelect').addEventListener('change', e => { selectedMetric = e.target.value; triggerUpdate(); });
+
+      const baseMapSelect = document.getElementById('baseMapSelect');
+      baseMapSelect.value = "osm";
+      baseMapSelect.addEventListener('change', e => {
+        const tileUrl = baseMapsConfig[e.target.value];
+        if (tileUrl) {
+          map.removeLayer(currentMapTile); currentMapTile = L.tileLayer(tileUrl).addTo(map);
+          compareMap.removeLayer(currentCompareTile); currentCompareTile = L.tileLayer(tileUrl).addTo(compareMap);
+        }
+      });
+
+      document.getElementById('pointToggle').addEventListener('change', updatePoints);
+
+      // Theme toggle
+      document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+    }
+
+    function triggerUpdate() {
+      updateLayers();
+      updatePoints();
+      updateCharts();
+    }
+
+    function downloadChart(id) {
+      const url = document.getElementById(id).toDataURL('image/png');
+      const link = document.createElement('a');
+      link.download = `${id}_${selectedMetric}.png`;
+      link.href = url;
+      link.click();
+    }
+
+    function loadData() {
+      initSelectors();
+      Promise.all([
+        fetch('data/lga_boundary.geojson').then(res => res.json()),
+        fetch('data/lga_emissions.geojson').then(res => res.json()),
+        fetch('data/emission_points.geojson').then(res => res.json())
+      ]).then(([boundaries, emissions, points]) => {
+        // Merge emissions data into boundary features
+        boundaries.features.forEach(boundary => {
+          const match = emissions.features.find(e => e.properties.lganame === boundary.properties.lganame);
+          if (match) {
+            boundary.properties = { ...boundary.properties, ...match.properties };
+          }
+        });
+        geojsonData = boundaries;
+        pointData = points;
+        triggerUpdate();
+      }).catch(err => {
+        console.error('Failed to load data:', err);
+        alert('Data files could not be loaded. Please run the Python data prep script and serve this page through a local web server.');
+      });
+    }
+
+    loadData();
+  </script>
+</body>
+
+</html>

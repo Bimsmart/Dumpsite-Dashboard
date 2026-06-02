@@ -1,0 +1,13 @@
+{
+  "name": "lagos-dumpsite-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "prepare-data": "node prepare_dashboard_data.js",
+    "serve": "npx http-server -c-1"
+  },
+  "dependencies": {
+    "csv-parse": "^5.4.0",
+    "shapefile": "^0.6.6"
+  }
+}

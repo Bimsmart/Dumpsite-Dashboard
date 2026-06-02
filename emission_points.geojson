@@ -1,0 +1,2285 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3039925714135054,
+          6.677260159866306
+        ]
+      },
+      "properties": {
+        "lganame": "Ifako/Ijaye",
+        "year": "2020",
+        "ch4": 1916.7311904948644,
+        "no2": 6.75973376347014e-05,
+        "co": 0.05744363324738484,
+        "isi": 766.7068607653259,
+        "hotspots": 0.368147120055517
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.245758379017556,
+          6.598160847247661
+        ]
+      },
+      "properties": {
+        "lganame": "Alimosho",
+        "year": "2020",
+        "ch4": 1915.5625888092502,
+        "no2": 6.255546464478878e-05,
+        "co": 0.05705944808788138,
+        "isi": 766.2393139726553,
+        "hotspots": 0.09010226871987773
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3054099543372546,
+          6.640746448153268
+        ]
+      },
+      "properties": {
+        "lganame": "Agege",
+        "year": "2020",
+        "ch4": 1919.5143536145388,
+        "no2": 8.250578421237793e-05,
+        "co": 0.058001546055105185,
+        "isi": 767.8202707093537,
+        "hotspots": 0.4473436765397273
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3355702960550047,
+          6.619092007678947
+        ]
+      },
+      "properties": {
+        "lganame": "Ikeja",
+        "year": "2020",
+        "ch4": 1918.496034626043,
+        "no2": 9.016417825017368e-05,
+        "co": 0.0578531419228376,
+        "isi": 767.4129173178635,
+        "hotspots": 0.4705275229357798
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.4010061387235897,
+          6.607016304536908
+        ]
+      },
+      "properties": {
+        "lganame": "Kosofe",
+        "year": "2020",
+        "ch4": 1914.8784455453524,
+        "no2": 7.759688087549625e-05,
+        "co": 0.05731570051725459,
+        "isi": 765.9658288497427,
+        "hotspots": 0.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.482321257651317,
+          6.518637664597204
+        ]
+      },
+      "properties": {
+        "lganame": "Lagos Island",
+        "year": "2020",
+        "ch4": null,
+        "no2": 6.103717054756109e-05,
+        "co": 0.05502651641995977,
+        "isi": null,
+        "hotspots": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.304115604148963,
+          6.5587316159413955
+        ]
+      },
+      "properties": {
+        "lganame": "Oshodi/Isolo",
+        "year": "2020",
+        "ch4": 1914.8707925924798,
+        "no2": 8.384911616097117e-05,
+        "co": 0.05765072190040901,
+        "isi": 765.9628054085217,
+        "hotspots": 0.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3787118598498904,
+          6.55351748196088
+        ]
+      },
+      "properties": {
+        "lganame": "Shomolu",
+        "year": "2020",
+        "ch4": null,
+        "no2": 8.772698355556002e-05,
+        "co": 0.05648853060425805,
+        "isi": null,
+        "hotspots": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3420032694533695,
+          6.551414958664762
+        ]
+      },
+      "properties": {
+        "lganame": "Mushin",
+        "year": "2020",
+        "ch4": 1919.3115623366652,
+        "no2": 9.635719873468356e-05,
+        "co": 0.05716669218301118,
+        "isi": 767.7390440837743,
+        "hotspots": 0.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.1462409133276084,
+          6.465596157847328
+        ]
+      },
+      "properties": {
+        "lganame": "Ojo",
+        "year": "2020",
+        "ch4": 1913.695017158511,
+        "no2": 3.8250637341863437e-05,
+        "co": 0.05593642084436633,
+        "isi": 765.492265457419,
+        "hotspots": 0.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3742413124729342,
+          6.504245660730808
+        ]
+      },
+      "properties": {
+        "lganame": "Lagos Mainland",
+        "year": "2020",
+        "ch4": null,
+        "no2": 8.17395788199995e-05,
+        "co": 0.05609122490617626,
+        "isi": null,
+        "hotspots": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3353434798327712,
+          6.507097483634247
+        ]
+      },
+      "properties": {
+        "lganame": "Surulere",
+        "year": "2020",
+        "ch4": null,
+        "no2": 8.309422525727967e-05,
+        "co": 0.0568616297866697,
+        "isi": null,
+        "hotspots": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.2650782915243166,
+          6.455061708557847
+        ]
+      },
+      "properties": {
+        "lganame": "Amuwo Odofin",
+        "year": "2020",
+        "ch4": null,
+        "no2": 5.1736937787715654e-05,
+        "co": 0.05655269808598292,
+        "isi": null,
+        "hotspots": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.324312870012685,
+          6.466175220086037
+        ]
+      },
+      "properties": {
+        "lganame": "Ajeromi/ Ifelodun",
+        "year": "2020",
+        "ch4": null,
+        "no2": 6.950362519036843e-05,
+        "co": 0.05644220499973568,
+        "isi": null,
+        "hotspots": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3625175923298385,
+          6.437950133515092
+        ]
+      },
+      "properties": {
+        "lganame": "Apapa",
+        "year": "2020",
+        "ch4": null,
+        "no2": 6.348666725891881e-05,
+        "co": 0.056287719937142974,
+        "isi": null,
+        "hotspots": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.5585194191752723,
+          6.626212480143373
+        ]
+      },
+      "properties": {
+        "lganame": "Ikorodu",
+        "year": "2020",
+        "ch4": 1897.8750335711436,
+        "no2": 4.9949771161887046e-05,
+        "co": 0.056222908087292106,
+        "isi": 759.1639209842958,
+        "hotspots": 0.040356083086053395
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.8660600486852092,
+          6.469669775572801
+        ]
+      },
+      "properties": {
+        "lganame": "Ibeju Lekki",
+        "year": "2020",
+        "ch4": null,
+        "no2": 2.737762473924717e-05,
+        "co": 0.05505064754951774,
+        "isi": null,
+        "hotspots": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2.912187120858117,
+          6.449436564716654
+        ]
+      },
+      "properties": {
+        "lganame": "Badagry",
+        "year": "2020",
+        "ch4": 1893.9719398928787,
+        "no2": 2.4870409719259623e-05,
+        "co": 0.054328343016533,
+        "isi": 757.6023199413277,
+        "hotspots": 0.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.9494882368312507,
+          6.562356632120885
+        ]
+      },
+      "properties": {
+        "lganame": "Epe",
+        "year": "2020",
+        "ch4": 1889.5096401611975,
+        "no2": 2.8437708009145275e-05,
+        "co": 0.0537917789654142,
+        "isi": 755.8173500697786,
+        "hotspots": 0.040498683599194674
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.5378238258679775,
+          6.456432759553906
+        ]
+      },
+      "properties": {
+        "lganame": "Eti-Osa",
+        "year": "2020",
+        "ch4": null,
+        "no2": 4.7527690206550145e-05,
+        "co": 0.05576817438182283,
+        "isi": null,
+        "hotspots": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3039925714135054,
+          6.677260159866306
+        ]
+      },
+      "properties": {
+        "lganame": "Ifako/Ijaye",
+        "year": "2021",
+        "ch4": 1933.922624038014,
+        "no2": 8.194726668829832e-05,
+        "co": 0.05538861296129188,
+        "isi": 773.5829254499891,
+        "hotspots": 0.051353226925746
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.245758379017556,
+          6.598160847247661
+        ]
+      },
+      "properties": {
+        "lganame": "Alimosho",
+        "year": "2021",
+        "ch4": 1931.6303984432489,
+        "no2": 7.32520068224996e-05,
+        "co": 0.054569761841334996,
+        "isi": 772.6658263263895,
+        "hotspots": 0.3552921571789497
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3054099543372546,
+          6.640746448153268
+        ]
+      },
+      "properties": {
+        "lganame": "Agege",
+        "year": "2021",
+        "ch4": 1935.439379715299,
+        "no2": 9.962786034438935e-05,
+        "co": 0.055548900882376476,
+        "isi": 774.1896739810915,
+        "hotspots": 0.7155618241654913
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3355702960550047,
+          6.619092007678947
+        ]
+      },
+      "properties": {
+        "lganame": "Ikeja",
+        "year": "2021",
+        "ch4": 1933.7568244934478,
+        "no2": 0.00011434566318874919,
+        "co": 0.0562667770128798,
+        "isi": 773.5168567429366,
+        "hotspots": 0.551314142678348
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.4010061387235897,
+          6.607016304536908
+        ]
+      },
+      "properties": {
+        "lganame": "Kosofe",
+        "year": "2021",
+        "ch4": 1930.064199390575,
+        "no2": 0.0001028547809347644,
+        "co": 0.05717310084383024,
+        "isi": 772.0400615923463,
+        "hotspots": 0.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.482321257651317,
+          6.518637664597204
+        ]
+      },
+      "properties": {
+        "lganame": "Lagos Island",
+        "year": "2021",
+        "ch4": null,
+        "no2": 7.590760718349565e-05,
+        "co": 0.05392896176667909,
+        "isi": null,
+        "hotspots": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.304115604148963,
+          6.5587316159413955
+        ]
+      },
+      "properties": {
+        "lganame": "Oshodi/Isolo",
+        "year": "2021",
+        "ch4": 1936.3290750286233,
+        "no2": 9.713017997924192e-05,
+        "co": 0.05529319897196942,
+        "isi": 774.5453382752877,
+        "hotspots": 1.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3787118598498904,
+          6.55351748196088
+        ]
+      },
+      "properties": {
+        "lganame": "Shomolu",
+        "year": "2021",
+        "ch4": null,
+        "no2": 0.0001142527172828832,
+        "co": 0.056589501617703875,
+        "isi": null,
+        "hotspots": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3420032694533695,
+          6.551414958664762
+        ]
+      },
+      "properties": {
+        "lganame": "Mushin",
+        "year": "2021",
+        "ch4": null,
+        "no2": 0.00011373428154706933,
+        "co": 0.05597182584116338,
+        "isi": null,
+        "hotspots": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.1462409133276084,
+          6.465596157847328
+        ]
+      },
+      "properties": {
+        "lganame": "Ojo",
+        "year": "2021",
+        "ch4": 1912.1500325685,
+        "no2": 4.278863652923363e-05,
+        "co": 0.05297907596406768,
+        "isi": 764.8733836645648,
+        "hotspots": 0.0003617072582589824
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3742413124729342,
+          6.504245660730808
+        ]
+      },
+      "properties": {
+        "lganame": "Lagos Mainland",
+        "year": "2021",
+        "ch4": null,
+        "no2": 0.00010071076026348639,
+        "co": 0.05539121965907474,
+        "isi": null,
+        "hotspots": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3353434798327712,
+          6.507097483634247
+        ]
+      },
+      "properties": {
+        "lganame": "Surulere",
+        "year": "2021",
+        "ch4": null,
+        "no2": 9.510657385789405e-05,
+        "co": 0.05492913356471177,
+        "isi": null,
+        "hotspots": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.2650782915243166,
+          6.455061708557847
+        ]
+      },
+      "properties": {
+        "lganame": "Amuwo Odofin",
+        "year": "2021",
+        "ch4": 1911.298042972974,
+        "no2": 5.580916279770775e-05,
+        "co": 0.053656210367186895,
+        "isi": 764.5327776961981,
+        "hotspots": 0.24316109422492407
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.324312870012685,
+          6.466175220086037
+        ]
+      },
+      "properties": {
+        "lganame": "Ajeromi/ Ifelodun",
+        "year": "2021",
+        "ch4": null,
+        "no2": 7.583094237322259e-05,
+        "co": 0.05386503778166074,
+        "isi": null,
+        "hotspots": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3625175923298385,
+          6.437950133515092
+        ]
+      },
+      "properties": {
+        "lganame": "Apapa",
+        "year": "2021",
+        "ch4": null,
+        "no2": 6.776049860571504e-05,
+        "co": 0.053814543014464145,
+        "isi": null,
+        "hotspots": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.5585194191752723,
+          6.626212480143373
+        ]
+      },
+      "properties": {
+        "lganame": "Ikorodu",
+        "year": "2021",
+        "ch4": 1919.437669625779,
+        "no2": 6.169531579962976e-05,
+        "co": 0.05492697550212473,
+        "isi": 767.7890503688184,
+        "hotspots": 0.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.8660600486852092,
+          6.469669775572801
+        ]
+      },
+      "properties": {
+        "lganame": "Ibeju Lekki",
+        "year": "2021",
+        "ch4": 1903.7562777564794,
+        "no2": 3.006821523066961e-05,
+        "co": 0.052455889575748184,
+        "isi": 761.5155029989561,
+        "hotspots": 0.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2.912187120858117,
+          6.449436564716654
+        ]
+      },
+      "properties": {
+        "lganame": "Badagry",
+        "year": "2021",
+        "ch4": 1904.3651538228562,
+        "no2": 2.7071303722595463e-05,
+        "co": 0.05192171291132226,
+        "isi": 761.7590943101054,
+        "hotspots": 0.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.9494882368312507,
+          6.562356632120885
+        ]
+      },
+      "properties": {
+        "lganame": "Epe",
+        "year": "2021",
+        "ch4": 1907.4107533060912,
+        "no2": 3.286540177530086e-05,
+        "co": 0.051956041481332045,
+        "isi": 762.9773203555138,
+        "hotspots": 0.10986759142496849
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.5378238258679775,
+          6.456432759553906
+        ]
+      },
+      "properties": {
+        "lganame": "Eti-Osa",
+        "year": "2021",
+        "ch4": null,
+        "no2": 5.420365940222386e-05,
+        "co": 0.05323878314932383,
+        "isi": null,
+        "hotspots": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3039925714135054,
+          6.677260159866306
+        ]
+      },
+      "properties": {
+        "lganame": "Ifako/Ijaye",
+        "year": "2022",
+        "ch4": 1952.2049873231595,
+        "no2": 8.388217608216165e-05,
+        "co": 0.05345853482016863,
+        "isi": 780.8953889217305,
+        "hotspots": 0.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.245758379017556,
+          6.598160847247661
+        ]
+      },
+      "properties": {
+        "lganame": "Alimosho",
+        "year": "2022",
+        "ch4": 1952.2985300555288,
+        "no2": 7.448365711188677e-05,
+        "co": 0.0533211307139299,
+        "isi": 780.93276837417,
+        "hotspots": 0.25014442518775276
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3054099543372546,
+          6.640746448153268
+        ]
+      },
+      "properties": {
+        "lganame": "Agege",
+        "year": "2022",
+        "ch4": 1954.793575955192,
+        "no2": 9.783630497171279e-05,
+        "co": 0.053738283125564126,
+        "isi": 781.9308991955651,
+        "hotspots": 0.07639868359191349
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3355702960550047,
+          6.619092007678947
+        ]
+      },
+      "properties": {
+        "lganame": "Ikeja",
+        "year": "2022",
+        "ch4": 1955.719811658704,
+        "no2": 0.00010812622912897861,
+        "co": 0.054450909740517826,
+        "isi": 782.3015752350972,
+        "hotspots": 0.5032707501486705
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.4010061387235897,
+          6.607016304536908
+        ]
+      },
+      "properties": {
+        "lganame": "Kosofe",
+        "year": "2022",
+        "ch4": 1954.0157543014034,
+        "no2": 9.585396648330759e-05,
+        "co": 0.05498949668610646,
+        "isi": 781.620123039291,
+        "hotspots": 0.6419170598460392
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.482321257651317,
+          6.518637664597204
+        ]
+      },
+      "properties": {
+        "lganame": "Lagos Island",
+        "year": "2022",
+        "ch4": null,
+        "no2": 7.328118727267137e-05,
+        "co": 0.05308030148038355,
+        "isi": null,
+        "hotspots": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.304115604148963,
+          6.5587316159413955
+        ]
+      },
+      "properties": {
+        "lganame": "Oshodi/Isolo",
+        "year": "2022",
+        "ch4": 1964.5782557646546,
+        "no2": 9.308990582924315e-05,
+        "co": 0.054092630877985076,
+        "isi": 785.8448542944273,
+        "hotspots": 0.9963016231764947
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3787118598498904,
+          6.55351748196088
+        ]
+      },
+      "properties": {
+        "lganame": "Shomolu",
+        "year": "2022",
+        "ch4": null,
+        "no2": 0.00010558224269316836,
+        "co": 0.05541282898135398,
+        "isi": null,
+        "hotspots": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3420032694533695,
+          6.551414958664762
+        ]
+      },
+      "properties": {
+        "lganame": "Mushin",
+        "year": "2022",
+        "ch4": 1973.4372855314539,
+        "no2": 0.00010688737757015824,
+        "co": 0.05455361349428724,
+        "isi": 789.3884964170028,
+        "hotspots": 1.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.1462409133276084,
+          6.465596157847328
+        ]
+      },
+      "properties": {
+        "lganame": "Ojo",
+        "year": "2022",
+        "ch4": 1940.7008129510784,
+        "no2": 4.4263271474182137e-05,
+        "co": 0.0522254226194989,
+        "isi": 776.2935129334136,
+        "hotspots": 0.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3742413124729342,
+          6.504245660730808
+        ]
+      },
+      "properties": {
+        "lganame": "Lagos Mainland",
+        "year": "2022",
+        "ch4": null,
+        "no2": 9.668984621356447e-05,
+        "co": 0.05404714078959986,
+        "isi": null,
+        "hotspots": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3353434798327712,
+          6.507097483634247
+        ]
+      },
+      "properties": {
+        "lganame": "Surulere",
+        "year": "2022",
+        "ch4": 1963.0299702752568,
+        "no2": 9.185307325065389e-05,
+        "co": 0.05388242663150569,
+        "isi": 785.2254565600149,
+        "hotspots": 1.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.2650782915243166,
+          6.455061708557847
+        ]
+      },
+      "properties": {
+        "lganame": "Amuwo Odofin",
+        "year": "2022",
+        "ch4": 1954.5948459823207,
+        "no2": 5.5485816686233446e-05,
+        "co": 0.05358933605563067,
+        "isi": 781.8514530831334,
+        "hotspots": 0.5085764550652397
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.324312870012685,
+          6.466175220086037
+        ]
+      },
+      "properties": {
+        "lganame": "Ajeromi/ Ifelodun",
+        "year": "2022",
+        "ch4": 1960.7913932525103,
+        "no2": 7.59703053709784e-05,
+        "co": 0.05322500252344849,
+        "isi": 784.3299152336742,
+        "hotspots": 1.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3625175923298385,
+          6.437950133515092
+        ]
+      },
+      "properties": {
+        "lganame": "Apapa",
+        "year": "2022",
+        "ch4": 1960.7914172510436,
+        "no2": 6.662087857176022e-05,
+        "co": 0.05346087399084694,
+        "isi": 784.329901487181,
+        "hotspots": 1.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.5585194191752723,
+          6.626212480143373
+        ]
+      },
+      "properties": {
+        "lganame": "Ikorodu",
+        "year": "2022",
+        "ch4": 1938.061339736173,
+        "no2": 5.795569232649809e-05,
+        "co": 0.053921422234572074,
+        "isi": 775.2381283785064,
+        "hotspots": 0.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.8660600486852092,
+          6.469669775572801
+        ]
+      },
+      "properties": {
+        "lganame": "Ibeju Lekki",
+        "year": "2022",
+        "ch4": 1900.9187163865838,
+        "no2": 2.9968084023062645e-05,
+        "co": 0.05207906113626604,
+        "isi": 760.3804801563596,
+        "hotspots": 0.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2.912187120858117,
+          6.449436564716654
+        ]
+      },
+      "properties": {
+        "lganame": "Badagry",
+        "year": "2022",
+        "ch4": 1929.9312995505716,
+        "no2": 2.7249424195500384e-05,
+        "co": 0.0509534625302179,
+        "isi": 771.9852201741913,
+        "hotspots": 0.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.9494882368312507,
+          6.562356632120885
+        ]
+      },
+      "properties": {
+        "lganame": "Epe",
+        "year": "2022",
+        "ch4": 1915.981232628892,
+        "no2": 3.1893597927991334e-05,
+        "co": 0.05173671997199986,
+        "isi": 766.405433083445,
+        "hotspots": 0.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.5378238258679775,
+          6.456432759553906
+        ]
+      },
+      "properties": {
+        "lganame": "Eti-Osa",
+        "year": "2022",
+        "ch4": null,
+        "no2": 5.3761766930336474e-05,
+        "co": 0.05290389027017845,
+        "isi": null,
+        "hotspots": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3039925714135054,
+          6.677260159866306
+        ]
+      },
+      "properties": {
+        "lganame": "Ifako/Ijaye",
+        "year": "2023",
+        "ch4": 1948.7362376867786,
+        "no2": 8.169348742203258e-05,
+        "co": 0.05167646458497174,
+        "isi": 779.5074427835788,
+        "hotspots": 0.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.245758379017556,
+          6.598160847247661
+        ]
+      },
+      "properties": {
+        "lganame": "Alimosho",
+        "year": "2023",
+        "ch4": 1955.584591709967,
+        "no2": 7.395898661304041e-05,
+        "co": 0.051417725248914976,
+        "isi": 782.2467170009446,
+        "hotspots": 0.17394044430439573
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3054099543372546,
+          6.640746448153268
+        ]
+      },
+      "properties": {
+        "lganame": "Agege",
+        "year": "2023",
+        "ch4": 1950.2317153757838,
+        "no2": 9.464538439961172e-05,
+        "co": 0.0520784717402589,
+        "isi": 780.1057388941331,
+        "hotspots": 0.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3355702960550047,
+          6.619092007678947
+        ]
+      },
+      "properties": {
+        "lganame": "Ikeja",
+        "year": "2023",
+        "ch4": 1954.9839372816475,
+        "no2": 0.00010501942552388295,
+        "co": 0.05243970706813695,
+        "isi": 782.0067215962248,
+        "hotspots": 0.05386118426641747
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.4010061387235897,
+          6.607016304536908
+        ]
+      },
+      "properties": {
+        "lganame": "Kosofe",
+        "year": "2023",
+        "ch4": 1961.7092864957488,
+        "no2": 8.923212607809159e-05,
+        "co": 0.05280875551585294,
+        "isi": 784.6969480184226,
+        "hotspots": 0.5419659239842728
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.482321257651317,
+          6.518637664597204
+        ]
+      },
+      "properties": {
+        "lganame": "Lagos Island",
+        "year": "2023",
+        "ch4": 1950.9208504153473,
+        "no2": 6.823583347966369e-05,
+        "co": 0.05151273344451579,
+        "isi": 780.3812422320407,
+        "hotspots": 0.1008054674151818
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.304115604148963,
+          6.5587316159413955
+        ]
+      },
+      "properties": {
+        "lganame": "Oshodi/Isolo",
+        "year": "2023",
+        "ch4": 1964.2666600976543,
+        "no2": 9.597050644989487e-05,
+        "co": 0.05163157165358593,
+        "isi": 785.7196055216526,
+        "hotspots": 0.753232323232323
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3787118598498904,
+          6.55351748196088
+        ]
+      },
+      "properties": {
+        "lganame": "Shomolu",
+        "year": "2023",
+        "ch4": 1963.7940544075186,
+        "no2": 9.562817033210493e-05,
+        "co": 0.05289120348256336,
+        "isi": 785.5308780337376,
+        "hotspots": 0.916631130063966
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3420032694533695,
+          6.551414958664762
+        ]
+      },
+      "properties": {
+        "lganame": "Mushin",
+        "year": "2023",
+        "ch4": 1962.588151148691,
+        "no2": 0.00010446443433217868,
+        "co": 0.05192455878701438,
+        "isi": 785.0482781617254,
+        "hotspots": 0.37969588550983907
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.1462409133276084,
+          6.465596157847328
+        ]
+      },
+      "properties": {
+        "lganame": "Ojo",
+        "year": "2023",
+        "ch4": 1949.8565905275896,
+        "no2": 4.449451783589582e-05,
+        "co": 0.05062816219311561,
+        "isi": 779.9553088246649,
+        "hotspots": 0.09512131602934155
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3742413124729342,
+          6.504245660730808
+        ]
+      },
+      "properties": {
+        "lganame": "Lagos Mainland",
+        "year": "2023",
+        "ch4": 1958.0615526451882,
+        "no2": 8.6799719331583e-05,
+        "co": 0.05207702871803155,
+        "isi": 783.2376706951566,
+        "hotspots": 0.044079958995386984
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3353434798327712,
+          6.507097483634247
+        ]
+      },
+      "properties": {
+        "lganame": "Surulere",
+        "year": "2023",
+        "ch4": 1965.553202980048,
+        "no2": 8.864063409747698e-05,
+        "co": 0.05163690125923609,
+        "isi": 786.2342214415562,
+        "hotspots": 0.7740220281048235
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.2650782915243166,
+          6.455061708557847
+        ]
+      },
+      "properties": {
+        "lganame": "Amuwo Odofin",
+        "year": "2023",
+        "ch4": 1959.2009006592218,
+        "no2": 5.599528196537222e-05,
+        "co": 0.051561164079017355,
+        "isi": 783.6932701530567,
+        "hotspots": 0.4812930061729761
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.324312870012685,
+          6.466175220086037
+        ]
+      },
+      "properties": {
+        "lganame": "Ajeromi/ Ifelodun",
+        "year": "2023",
+        "ch4": 1969.1058077509906,
+        "no2": 7.371004323272747e-05,
+        "co": 0.0515242134260588,
+        "isi": 787.655229952268,
+        "hotspots": 0.9280936454849498
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3625175923298385,
+          6.437950133515092
+        ]
+      },
+      "properties": {
+        "lganame": "Apapa",
+        "year": "2023",
+        "ch4": 1958.4479772893844,
+        "no2": 6.526598858930008e-05,
+        "co": 0.05163077205092437,
+        "isi": 783.3921214518621,
+        "hotspots": 0.13229750850418312
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.5585194191752723,
+          6.626212480143373
+        ]
+      },
+      "properties": {
+        "lganame": "Ikorodu",
+        "year": "2023",
+        "ch4": 1948.5139622984711,
+        "no2": 5.7036880227027186e-05,
+        "co": 0.0516281462117071,
+        "isi": 779.4185119188496,
+        "hotspots": 0.005366443941705687
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.8660600486852092,
+          6.469669775572801
+        ]
+      },
+      "properties": {
+        "lganame": "Ibeju Lekki",
+        "year": "2023",
+        "ch4": 1944.115701672584,
+        "no2": 2.9927474943211712e-05,
+        "co": 0.049823454868417626,
+        "isi": 777.6587470073664,
+        "hotspots": 0.03243941350755906
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2.912187120858117,
+          6.449436564716654
+        ]
+      },
+      "properties": {
+        "lganame": "Badagry",
+        "year": "2023",
+        "ch4": 1934.3383252568153,
+        "no2": 2.844106705851281e-05,
+        "co": 0.04985662395674639,
+        "isi": 773.7478042130895,
+        "hotspots": 0.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.9494882368312507,
+          6.562356632120885
+        ]
+      },
+      "properties": {
+        "lganame": "Epe",
+        "year": "2023",
+        "ch4": 1925.5118245344884,
+        "no2": 3.3124799676960646e-05,
+        "co": 0.04924508568173442,
+        "isi": 770.2170526788948,
+        "hotspots": 0.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.5378238258679775,
+          6.456432759553906
+        ]
+      },
+      "properties": {
+        "lganame": "Eti-Osa",
+        "year": "2023",
+        "ch4": 1960.7949494631507,
+        "no2": 5.2203998999523636e-05,
+        "co": 0.05122764368792041,
+        "isi": 784.3308049675818,
+        "hotspots": 0.42067876874506704
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3039925714135054,
+          6.677260159866306
+        ]
+      },
+      "properties": {
+        "lganame": "Ifako/Ijaye",
+        "year": "2024",
+        "ch4": 1968.1213372084399,
+        "no2": 7.461568674120868e-05,
+        "co": 0.05600277893044797,
+        "isi": 787.2625616935991,
+        "hotspots": 0.8470969234328012
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.245758379017556,
+          6.598160847247661
+        ]
+      },
+      "properties": {
+        "lganame": "Alimosho",
+        "year": "2024",
+        "ch4": 1970.2715964719623,
+        "no2": 6.842127106742807e-05,
+        "co": 0.055828660069925505,
+        "isi": 788.1226197012477,
+        "hotspots": 0.9330129720077728
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3054099543372546,
+          6.640746448153268
+        ]
+      },
+      "properties": {
+        "lganame": "Agege",
+        "year": "2024",
+        "ch4": 1970.3315491236192,
+        "no2": 8.831408080210663e-05,
+        "co": 0.056665006619133054,
+        "isi": 788.1468168110308,
+        "hotspots": 1.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3355702960550047,
+          6.619092007678947
+        ]
+      },
+      "properties": {
+        "lganame": "Ikeja",
+        "year": "2024",
+        "ch4": 1965.9232679668564,
+        "no2": 9.390325323584526e-05,
+        "co": 0.056577356510930446,
+        "isi": 786.383484392009,
+        "hotspots": 0.4421884291903832
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.4010061387235897,
+          6.607016304536908
+        ]
+      },
+      "properties": {
+        "lganame": "Kosofe",
+        "year": "2024",
+        "ch4": 1959.6301309945197,
+        "no2": 8.016423836101693e-05,
+        "co": 0.056558806915794055,
+        "isi": 783.8662201570202,
+        "hotspots": 0.013368283093053738
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.482321257651317,
+          6.518637664597204
+        ]
+      },
+      "properties": {
+        "lganame": "Lagos Island",
+        "year": "2024",
+        "ch4": 1949.6972623937154,
+        "no2": 6.62093605721423e-05,
+        "co": 0.05525598887583842,
+        "isi": 779.8927421279816,
+        "hotspots": 0.0041656496623545675
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.304115604148963,
+          6.5587316159413955
+        ]
+      },
+      "properties": {
+        "lganame": "Oshodi/Isolo",
+        "year": "2024",
+        "ch4": 1967.4785121351088,
+        "no2": 8.635235384411162e-05,
+        "co": 0.056148920007389996,
+        "isi": 787.005472307369,
+        "hotspots": 0.8312121212121208
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3787118598498904,
+          6.55351748196088
+        ]
+      },
+      "properties": {
+        "lganame": "Shomolu",
+        "year": "2024",
+        "ch4": 1960.6369938581076,
+        "no2": 8.710976816814789e-05,
+        "co": 0.056516495814135245,
+        "isi": 784.2689571556158,
+        "hotspots": 0.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3420032694533695,
+          6.551414958664762
+        ]
+      },
+      "properties": {
+        "lganame": "Mushin",
+        "year": "2024",
+        "ch4": 1964.8996740753523,
+        "no2": 9.42466202639253e-05,
+        "co": 0.056235477500850437,
+        "isi": 785.9739614858332,
+        "hotspots": 0.3403398926654741
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.1462409133276084,
+          6.465596157847328
+        ]
+      },
+      "properties": {
+        "lganame": "Ojo",
+        "year": "2024",
+        "ch4": 1953.1292866916356,
+        "no2": 4.037104030287025e-05,
+        "co": 0.054751462866405115,
+        "isi": 781.2654166722353,
+        "hotspots": 0.11367680888927473
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3742413124729342,
+          6.504245660730808
+        ]
+      },
+      "properties": {
+        "lganame": "Lagos Mainland",
+        "year": "2024",
+        "ch4": 1954.184069535536,
+        "no2": 8.380673192300761e-05,
+        "co": 0.05562538853630347,
+        "isi": 781.6875634937049,
+        "hotspots": 0.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3353434798327712,
+          6.507097483634247
+        ]
+      },
+      "properties": {
+        "lganame": "Surulere",
+        "year": "2024",
+        "ch4": 1962.7169668167126,
+        "no2": 8.391890937853182e-05,
+        "co": 0.05555935931081644,
+        "isi": 785.1007059381311,
+        "hotspots": 0.19799974680339286
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.2650782915243166,
+          6.455061708557847
+        ]
+      },
+      "properties": {
+        "lganame": "Amuwo Odofin",
+        "year": "2024",
+        "ch4": 1960.0775920988663,
+        "no2": 5.111096226444712e-05,
+        "co": 0.05534577293311366,
+        "isi": 784.0448911716165,
+        "hotspots": 0.20284532159214105
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.324312870012685,
+          6.466175220086037
+        ]
+      },
+      "properties": {
+        "lganame": "Ajeromi/ Ifelodun",
+        "year": "2024",
+        "ch4": 1965.107964788173,
+        "no2": 7.077005269494367e-05,
+        "co": 0.055160060133831706,
+        "isi": 786.0570006998211,
+        "hotspots": 0.2307692307692308
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3625175923298385,
+          6.437950133515092
+        ]
+      },
+      "properties": {
+        "lganame": "Apapa",
+        "year": "2024",
+        "ch4": 1962.169957986039,
+        "no2": 6.296971251055354e-05,
+        "co": 0.055293891094021316,
+        "isi": 784.8818287065886,
+        "hotspots": 0.1325733198492231
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.5585194191752723,
+          6.626212480143373
+        ]
+      },
+      "properties": {
+        "lganame": "Ikorodu",
+        "year": "2024",
+        "ch4": 1957.9162630463677,
+        "no2": 5.2638117266220687e-05,
+        "co": 0.05534533069970875,
+        "isi": 783.1803599745629,
+        "hotspots": 0.08470563476613878
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.8660600486852092,
+          6.469669775572801
+        ]
+      },
+      "properties": {
+        "lganame": "Ibeju Lekki",
+        "year": "2024",
+        "ch4": 1941.8825456635918,
+        "no2": 3.128799455798118e-05,
+        "co": 0.05422055975492576,
+        "isi": 776.7665843561738,
+        "hotspots": 0.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2.912187120858117,
+          6.449436564716654
+        ]
+      },
+      "properties": {
+        "lganame": "Badagry",
+        "year": "2024",
+        "ch4": 1943.8439661846958,
+        "no2": 2.6150346639415426e-05,
+        "co": 0.053396774638231975,
+        "isi": 777.5509448201593,
+        "hotspots": 0.0034427485135380565
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.9494882368312507,
+          6.562356632120885
+        ]
+      },
+      "properties": {
+        "lganame": "Epe",
+        "year": "2024",
+        "ch4": 1929.5347348633054,
+        "no2": 3.261077572593737e-05,
+        "co": 0.05367607174537303,
+        "isi": 771.8273243770301,
+        "hotspots": 0.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.5378238258679775,
+          6.456432759553906
+        ]
+      },
+      "properties": {
+        "lganame": "Eti-Osa",
+        "year": "2024",
+        "ch4": 1963.0453056844153,
+        "no2": 5.1425568527907745e-05,
+        "co": 0.05551827469988737,
+        "isi": 785.2320198413905,
+        "hotspots": 0.16005034237078436
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3039925714135054,
+          6.677260159866306
+        ]
+      },
+      "properties": {
+        "lganame": "Ifako/Ijaye",
+        "year": "2025",
+        "ch4": 1955.753100677554,
+        "no2": 7.214260805835355e-05,
+        "co": 0.05271431006100127,
+        "isi": 782.3144440984499,
+        "hotspots": 0.227735368956743
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.245758379017556,
+          6.598160847247661
+        ]
+      },
+      "properties": {
+        "lganame": "Alimosho",
+        "year": "2025",
+        "ch4": 1964.0071158698706,
+        "no2": 5.779670855009881e-05,
+        "co": 0.052090454599228425,
+        "isi": 785.6158891904461,
+        "hotspots": 0.6310592931043537
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3054099543372546,
+          6.640746448153268
+        ]
+      },
+      "properties": {
+        "lganame": "Agege",
+        "year": "2025",
+        "ch4": 1957.6684179931092,
+        "no2": 8.170933140500974e-05,
+        "co": 0.05302791361639348,
+        "isi": 783.0806527739138,
+        "hotspots": 0.388810531264692
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3355702960550047,
+          6.619092007678947
+        ]
+      },
+      "properties": {
+        "lganame": "Ikeja",
+        "year": "2025",
+        "ch4": 1955.4684853462159,
+        "no2": 9.010540000464314e-05,
+        "co": 0.052932828638543275,
+        "isi": 782.2006588825358,
+        "hotspots": 0.1460368702744032
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.4010061387235897,
+          6.607016304536908
+        ]
+      },
+      "properties": {
+        "lganame": "Kosofe",
+        "year": "2025",
+        "ch4": 1949.9992535100416,
+        "no2": 8.48801445469737e-05,
+        "co": 0.05335227014827602,
+        "isi": 780.0130691796039,
+        "hotspots": 0.19491480996068156
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.482321257651317,
+          6.518637664597204
+        ]
+      },
+      "properties": {
+        "lganame": "Lagos Island",
+        "year": "2025",
+        "ch4": 1935.591803398749,
+        "no2": 6.684776447367638e-05,
+        "co": 0.05232120912232302,
+        "isi": 774.2498250584979,
+        "hotspots": 0.008347571393702707
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.304115604148963,
+          6.5587316159413955
+        ]
+      },
+      "properties": {
+        "lganame": "Oshodi/Isolo",
+        "year": "2025",
+        "ch4": 1957.0007587201387,
+        "no2": 7.127511266604461e-05,
+        "co": 0.05256104659801474,
+        "isi": 782.8134686959949,
+        "hotspots": 0.29797979797979784
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3787118598498904,
+          6.55351748196088
+        ]
+      },
+      "properties": {
+        "lganame": "Shomolu",
+        "year": "2025",
+        "ch4": 1954.768781933223,
+        "no2": 8.724902063200396e-05,
+        "co": 0.053263539728701986,
+        "isi": 781.920859195379,
+        "hotspots": 0.38230277185501066
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3420032694533695,
+          6.551414958664762
+        ]
+      },
+      "properties": {
+        "lganame": "Mushin",
+        "year": "2025",
+        "ch4": 1958.9778252775209,
+        "no2": 8.332776324450118e-05,
+        "co": 0.05281663264816238,
+        "isi": 783.6043634338878,
+        "hotspots": 0.7193649373881933
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.1462409133276084,
+          6.465596157847328
+        ]
+      },
+      "properties": {
+        "lganame": "Ojo",
+        "year": "2025",
+        "ch4": 1941.0019946961834,
+        "no2": 3.2580824257527605e-05,
+        "co": 0.051474893356690615,
+        "isi": 776.4136780051003,
+        "hotspots": 0.2714961586874431
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3742413124729342,
+          6.504245660730808
+        ]
+      },
+      "properties": {
+        "lganame": "Lagos Mainland",
+        "year": "2025",
+        "ch4": 1951.4072595334744,
+        "no2": 7.506304446682509e-05,
+        "co": 0.052652376754469765,
+        "isi": 780.5760931796436,
+        "hotspots": 0.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3353434798327712,
+          6.507097483634247
+        ]
+      },
+      "properties": {
+        "lganame": "Surulere",
+        "year": "2025",
+        "ch4": 1956.9355007029822,
+        "no2": 6.77832212535864e-05,
+        "co": 0.052516206941815274,
+        "isi": 782.7873530570562,
+        "hotspots": 0.20179769591087482
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.2650782915243166,
+          6.455061708557847
+        ]
+      },
+      "properties": {
+        "lganame": "Amuwo Odofin",
+        "year": "2025",
+        "ch4": 1949.7490879303566,
+        "no2": 3.9162486529003793e-05,
+        "co": 0.05188595836184123,
+        "isi": 779.9126203686034,
+        "hotspots": 0.2639776976347987
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.324312870012685,
+          6.466175220086037
+        ]
+      },
+      "properties": {
+        "lganame": "Ajeromi/ Ifelodun",
+        "year": "2025",
+        "ch4": 1953.782489599032,
+        "no2": 5.371903621565076e-05,
+        "co": 0.051938115618897045,
+        "isi": 781.5259991701801,
+        "hotspots": 0.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3625175923298385,
+          6.437950133515092
+        ]
+      },
+      "properties": {
+        "lganame": "Apapa",
+        "year": "2025",
+        "ch4": 1946.7429655165995,
+        "no2": 4.844544408281726e-05,
+        "co": 0.05189759214162822,
+        "isi": 778.7101775605806,
+        "hotspots": 0.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.5585194191752723,
+          6.626212480143373
+        ]
+      },
+      "properties": {
+        "lganame": "Ikorodu",
+        "year": "2025",
+        "ch4": 1948.5792657626973,
+        "no2": 5.800922921500797e-05,
+        "co": 0.05302094404188961,
+        "isi": 779.4449818443194,
+        "hotspots": 0.2641026990056295
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.8660600486852092,
+          6.469669775572801
+        ]
+      },
+      "properties": {
+        "lganame": "Ibeju Lekki",
+        "year": "2025",
+        "ch4": 1928.8709379310112,
+        "no2": 3.0052550497310144e-05,
+        "co": 0.05194262900075271,
+        "isi": 771.5613713480461,
+        "hotspots": 0.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2.912187120858117,
+          6.449436564716654
+        ]
+      },
+      "properties": {
+        "lganame": "Badagry",
+        "year": "2025",
+        "ch4": 1933.1835228713717,
+        "no2": 2.4531101537157384e-05,
+        "co": 0.05105824699104092,
+        "isi": 773.2861822961812,
+        "hotspots": 0.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.9494882368312507,
+          6.562356632120885
+        ]
+      },
+      "properties": {
+        "lganame": "Epe",
+        "year": "2025",
+        "ch4": 1909.0397648701376,
+        "no2": 3.496615628200731e-05,
+        "co": 0.05118687946519101,
+        "isi": 763.6287149060763,
+        "hotspots": 0.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.5378238258679775,
+          6.456432759553906
+        ]
+      },
+      "properties": {
+        "lganame": "Eti-Osa",
+        "year": "2025",
+        "ch4": 1948.5951749131589,
+        "no2": 4.5468183637035495e-05,
+        "co": 0.052343895003886254,
+        "isi": 779.451171852879,
+        "hotspots": 0.07854263102881888
+      }
+    }
+  ]
+}

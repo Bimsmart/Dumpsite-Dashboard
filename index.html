@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lagos Environmental Risk Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app-shell">
+
+  <!-- ── SIDEBAR ── -->
+  <nav class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-icon"><img src="logo.png" alt="Logo" style="width:64px;height:64px;object-fit:contain;display:block"></div>
+      <div class="brand-text">
+        <div class="brand-title">Lagos ERM</div>
+        <div class="brand-sub">Environmental Risk Monitor</div>
+      </div>
+    </div>
+
+    <ul class="nav-list">
+      <li class="nav-item active" data-section="dashboard"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00d4ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="12" width="4" height="9"/><rect x="10" y="7" width="4" height="14"/><rect x="17" y="3" width="4" height="18"/></svg></span><span class="nav-label">Dashboard</span></li>
+      <li class="nav-item" data-section="analysis"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00d4ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3,6 9,3 15,6 21,3 21,18 15,21 9,18 3,21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg></span><span class="nav-label">Spatial Analysis</span></li>
+      <li class="nav-item" data-section="gas"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00d4ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/></svg></span><span class="nav-label">Gas Emissions</span></li>
+      <li class="nav-item" data-section="dumpsites"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00d4ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span><span class="nav-label">Landfills</span></li>
+      <li class="nav-item" data-section="about"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00d4ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></span><span class="nav-label">About</span></li>
+      <li class="nav-item" data-section="reports"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00d4ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10,9 9,9 8,9"/></svg></span><span class="nav-label">Reports</span></li>
+    </ul>
+
+    <div class="sidebar-controls">
+      <div class="ctrl-label">YEAR</div>
+      <select id="yearSelect" class="ctrl-select">
+        <option value="2018">2018</option>
+        <option value="2019">2019</option>
+        <option value="2020">2020</option>
+        <option value="2021">2021</option>
+        <option value="2022">2022</option>
+        <option value="2023">2023</option>
+        <option value="2024">2024</option>
+        <option value="2025" selected>2025</option>
+      </select>
+
+      <div class="ctrl-label">METRIC</div>
+      <select id="metricSelect" class="ctrl-select">
+        <option value="ch4">CH&#8324; Methane</option>
+        <option value="no2">NO&#8322; Nitrogen Dioxide</option>
+        <option value="co">CO Carbon Monoxide</option>
+      </select>
+
+      <div class="ctrl-label">BASEMAP</div>
+      <select id="basemapSelect" class="ctrl-select">
+        <option value="carto" selected>Carto Dark</option>
+        <option value="osm">OpenStreetMap</option>
+        <option value="satellite">Satellite</option>
+      </select>
+
+      <div class="ctrl-label">BASE LAYERS</div>
+      <div class="layer-toggles">
+        <label class="layer-toggle">
+          <input type="checkbox" id="lgaBoundaries" checked>
+          <span class="toggle-track"></span>
+          <span class="toggle-label">LGA Boundaries</span>
+        </label>
+        <label class="layer-toggle">
+          <input type="checkbox" id="landfillsPoints" checked>
+          <span class="toggle-track"></span>
+          <span class="toggle-label">Landfills</span>
+        </label>
+        <label class="layer-toggle">
+          <input type="checkbox" id="bufferLayer">
+          <span class="toggle-track"></span>
+          <span class="toggle-label">Buffer Zones</span>
+        </label>
+      </div>
+
+      <div class="ctrl-label" style="margin-top:10px">GEE LAYERS <span id="gee-layer-badge" style="display:none;font-size:8px;background:rgba(0,229,160,0.15);color:#00e5a0;border:1px solid rgba(0,229,160,0.3);border-radius:99px;padding:1px 6px;margin-left:4px;font-weight:700">LIVE</span></div>
+      <div class="layer-toggles">
+        <label class="layer-toggle">
+          <input type="checkbox" id="rasterLayer">
+          <span class="toggle-track"></span>
+          <span class="toggle-label">Emission Surface</span>
+        </label>
+        <label class="layer-toggle">
+          <input type="checkbox" id="geeLGALayer">
+          <span class="toggle-track"></span>
+          <span class="toggle-label">GEE LGA Boundaries</span>
+        </label>
+        <label class="layer-toggle">
+          <input type="checkbox" id="geeLagosLayer">
+          <span class="toggle-track"></span>
+          <span class="toggle-label">Lagos State Boundary</span>
+        </label>
+        <label class="layer-toggle">
+          <input type="checkbox" id="geeHotspotsLayer">
+          <span class="toggle-track"></span>
+          <span class="toggle-label">Hotspots Overlay</span>
+        </label>
+      </div>
+
+      <div class="ctrl-label">FILTER LGA</div>
+      <select id="lgaSelect" class="ctrl-select">
+        <option value="">All LGAs</option>
+      </select>
+    </div>
+  </nav>
+
+  <!-- ── MAIN AREA ── -->
+  <div class="main-area">
+
+    <!-- TOPBAR -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <h1 class="page-title">Lagos <span>Environmental</span> Risk Dashboard</h1>
+        <p class="page-sub">Spatial Analysis · Dumpsite Pollution · Gas Emissions · 2018–2025</p>
+      </div>
+      <div id="gee-indicator" style="display:none;align-items:center;gap:6px;background:rgba(0,229,160,0.1);border:1px solid rgba(0,229,160,0.25);border-radius:99px;padding:4px 12px;font-size:10px;font-weight:700;color:#00e5a0;flex-shrink:0"><span style="width:6px;height:6px;border-radius:50%;background:#00e5a0;animation:pulse 2s infinite"></span>GEE LIVE</div>
+      <div class="topbar-center">
+        <div class="search-box">
+          <span class="search-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#00d4ff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
+          <input type="text" id="locationSearch" placeholder="Search location or LGA..." class="search-input">
+          <button id="searchButton" class="search-btn">Go</button>
+        </div>
+      </div>
+      <div class="topbar-kpis">
+        <div class="strip-card">
+          <div class="strip-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#00d4ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3,11 12,2 21,11"/><polyline points="3,16 12,7 21,16"/><polyline points="3,21 12,12 21,21"/></svg></div>
+          <div>
+            <div class="strip-val" id="kpi-dumpsites">-</div>
+            <div class="strip-lbl">Total Landfills</div>
+          </div>
+        </div>
+        <div class="strip-card danger">
+          <div class="strip-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#00d4ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+          <div>
+            <div class="strip-val" id="kpi-highest-lga">-</div>
+            <div class="strip-lbl">Highest Risk LGA</div>
+          </div>
+        </div>
+        <div class="strip-card safe">
+          <div class="strip-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#00d4ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9,12 11,14 15,10"/></svg></div>
+          <div>
+            <div class="strip-val" id="kpi-lowest-lga">-</div>
+            <div class="strip-lbl">Lowest Risk LGA</div>
+          </div>
+        </div>
+        <div class="strip-card">
+          <div class="strip-icon" id="yoy-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#00d4ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23,6 13.5,15.5 8.5,10.5 1,18"/><polyline points="17,6 23,6 23,12"/></svg></div>
+          <div>
+            <div class="strip-val" id="kpi-yoy-change">-</div>
+            <div class="strip-lbl">YoY Change</div>
+          </div>
+        </div>
+        <div class="strip-card accent">
+          <div class="strip-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#00d4ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg></div>
+          <div>
+            <div class="strip-val" id="kpi-avg-eri">-</div>
+            <div class="strip-lbl">Avg ERI Score</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- MAP + RIGHT PANEL -->
+    <div class="content-row">
+      <div class="map-wrap">
+        <div id="map"></div>
+        <div id="mapLegend" class="map-legend">
+          <strong id="legendTitle">Methane (CH&#8324;)</strong>
+          <div id="legendSub" style="font-size:9px;color:var(--t3);margin-top:1px;margin-bottom:4px">LGA-level &middot; Sentinel-5P</div>
+          <div id="legendContent"></div>
+        </div>
+        <div class="map-tip">Click an LGA to inspect emissions</div>
+        <div class="buffer-legend" id="bufferLegend" style="display:none">
+          <strong>Buffer Zones</strong>
+          <div class="bl-item"><span class="bl-dot" style="background:#00e5a0"></span>100 m &mdash; Immediate</div>
+          <div class="bl-item"><span class="bl-dot" style="background:#ffb547"></span>500 m &mdash; Moderate</div>
+          <div class="bl-item"><span class="bl-dot" style="background:#ff4d6a"></span>1 km &mdash; Extended</div>
+        </div>
+      </div>
+
+      <!-- RIGHT PANEL -->
+      <aside class="right-panel">
+        <div class="rp-header">LGA Inspector</div>
+
+        <div class="rp-section">
+          <div class="rp-section-title">Selected LGA</div>
+          <div class="rp-lga-name" id="stat-lga-name">— None Selected —</div>
+          <div class="rp-row">
+            <div class="rp-stat">
+              <div class="rp-stat-label">Current Value</div>
+              <div class="rp-stat-value accent" id="stat-current-value">-</div>
+            </div>
+            <div class="rp-stat">
+              <div class="rp-stat-label">YoY Change</div>
+              <div class="rp-stat-value" id="stat-trend">-</div>
+            </div>
+          </div>
+          <div class="rp-badge-wrap">
+            <span class="rp-stat-label">Risk Level &nbsp;</span>
+            <span class="stat-badge" id="stat-risk-class">—</span>
+          </div>
+        </div>
+
+        <div class="rp-section">
+          <div class="rp-section-title">Emission Summary</div>
+          <div class="emission-row">
+            <div class="emission-gas ch4">
+              <div class="eg-symbol">CH&#8324;</div>
+              <div class="eg-name">Methane</div>
+              <div class="eg-value" id="stat-ch4">-</div>
+            </div>
+            <div class="emission-gas no2">
+              <div class="eg-symbol">NO&#8322;</div>
+              <div class="eg-name">Nitrogen Dioxide</div>
+              <div class="eg-value" id="stat-no2">-</div>
+            </div>
+            <div class="emission-gas co">
+              <div class="eg-symbol">CO</div>
+              <div class="eg-name">Carbon Monoxide</div>
+              <div class="eg-value" id="stat-co">-</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="rp-section">
+          <div class="rp-section-title">Proximity</div>
+          <div class="prox-row">
+            <div class="prox-item">
+              <div class="prox-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00d4ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
+              <div>
+                <div class="rp-stat-label">Nearest Landfill</div>
+                <div class="rp-stat-value" id="stat-nearest-landfill">-</div>
+              </div>
+            </div>
+            <div class="prox-item">
+              <div class="prox-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00d4ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13,2 3,14 12,14 11,22 21,10 12,10 13,2"/></svg></div>
+              <div>
+                <div class="rp-stat-label">ISI Score</div>
+                <div class="rp-stat-value accent" id="stat-isi">-</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <!-- BOTTOM CHARTS -->
+    <div class="bottom-row">
+      <div class="charts-row">
+        <div class="chart-card">
+          <div class="chart-hdr">
+            <span>Emission Trend (2018–2025)</span>
+            <button class="dl-btn" data-chart="trendChart">&#8681;</button>
+          </div>
+          <canvas id="trendChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <div class="chart-hdr">
+            <span id="bar-chart-title">Top 10 LGAs — CH&#8324;</span>
+            <button class="dl-btn" data-chart="lgaComparisonChart">&#8681;</button>
+          </div>
+          <canvas id="lgaComparisonChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <div class="chart-hdr">
+            <span id="comp-chart-title">Gas Composition (2025)</span>
+            <button class="dl-btn" data-chart="compositionChart">&#8681;</button>
+          </div>
+          <canvas id="compositionChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ── SPATIAL ANALYSIS PANEL (slides over right panel) ── -->
+    <div class="sa-panel" id="saPanel">
+      <div class="sa-header">
+        <div class="sa-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#00d4ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3,11 12,2 21,11"/><polyline points="3,16 12,7 21,16"/><polyline points="3,21 12,12 21,21"/></svg>
+          Spatial Analysis
+        </div>
+        <button class="sa-close" id="saClose" title="Close">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7a8fa8" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <!-- Sub-tabs -->
+      <div class="sa-tabs">
+        <button class="sa-tab active" data-tab="rankings">Rankings</button>
+        <button class="sa-tab" data-tab="anomaly">Anomalies</button>
+        <button class="sa-tab" data-tab="buffer">Buffer Exposure</button>
+        <button class="sa-tab" data-tab="trend">YoY Trend</button>
+      </div>
+
+      <!-- Tab: Rankings -->
+      <div class="sa-content active" id="sa-rankings">
+        <div class="sa-controls-row">
+          <select id="sa-rank-metric" class="sa-select">
+            <option value="ch4">CH&#8324; Methane</option>
+            <option value="no2">NO&#8322; Nitrogen Dioxide</option>
+            <option value="co">CO Carbon Monoxide</option>
+            <option value="isi">ISI Score</option>
+          </select>
+          <select id="sa-rank-order" class="sa-select">
+            <option value="desc">Highest first</option>
+            <option value="asc">Lowest first</option>
+          </select>
+        </div>
+        <div class="sa-table-wrap">
+          <table class="sa-table" id="rankingsTable">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>LGA</th>
+                <th>Value</th>
+                <th>Risk</th>
+                <th>vs Avg</th>
+              </tr>
+            </thead>
+            <tbody id="rankingsBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tab: Anomalies -->
+      <div class="sa-content" id="sa-anomaly">
+        <div class="sa-desc">
+          LGAs with emissions <strong>&gt; 1.5 standard deviations</strong> above the mean are flagged as potential anomalies — possible indicators of unauthorized dumping activity.
+        </div>
+        <div class="sa-controls-row">
+          <select id="sa-anomaly-metric" class="sa-select">
+            <option value="ch4">CH&#8324; Methane</option>
+            <option value="no2">NO&#8322; Nitrogen Dioxide</option>
+            <option value="co">CO Carbon Monoxide</option>
+            <option value="isi">ISI Score</option>
+          </select>
+          <select id="sa-anomaly-threshold" class="sa-select">
+            <option value="1.0">1.0 std dev</option>
+            <option value="1.5" selected>1.5 std dev</option>
+            <option value="2.0">2.0 std dev</option>
+          </select>
+        </div>
+        <div id="anomalyCount" class="sa-anomaly-count"></div>
+        <div class="sa-table-wrap">
+          <table class="sa-table" id="anomalyTable">
+            <thead>
+              <tr><th>LGA</th><th>Value</th><th>Z-Score</th><th>Risk</th></tr>
+            </thead>
+            <tbody id="anomalyBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tab: Buffer Exposure -->
+      <div class="sa-content" id="sa-buffer">
+        <div class="sa-desc">
+          LGAs whose centroids fall within buffer zones of identified landfills. Closer proximity = higher potential exposure.
+        </div>
+        <div id="bufferExposureList" class="sa-exposure-list"></div>
+      </div>
+
+      <!-- Tab: YoY Trend -->
+      <div class="sa-content" id="sa-trend">
+        <div class="sa-controls-row">
+          <select id="sa-trend-metric" class="sa-select">
+            <option value="ch4">CH&#8324; Methane</option>
+            <option value="no2">NO&#8322; Nitrogen Dioxide</option>
+            <option value="co">CO Carbon Monoxide</option>
+            <option value="isi">ISI Score</option>
+          </select>
+        </div>
+        <!-- Year range slider -->
+        <div class="trend-year-range">
+          <div class="trend-year-labels">
+            <span class="trend-year-label">From: <strong id="trendFromLabel">2018</strong></span>
+            <span class="trend-year-label">To: <strong id="trendToLabel">2025</strong></span>
+          </div>
+          <div class="trend-sliders">
+            <div class="trend-slider-wrap">
+              <label class="trend-slider-lbl">Start</label>
+              <input type="range" id="sa-trend-from" class="trend-slider" min="2018" max="2025" value="2018" step="1">
+            </div>
+            <div class="trend-slider-wrap">
+              <label class="trend-slider-lbl">End</label>
+              <input type="range" id="sa-trend-to" class="trend-slider" min="2018" max="2025" value="2025" step="1">
+            </div>
+          </div>
+        </div>
+        <div class="sa-table-wrap">
+          <table class="sa-table" id="trendTable">
+            <thead id="trendHead">
+              <tr><th>LGA</th><th>2018</th><th>2019</th><th>2020</th><th>2021</th><th>2022</th><th>2023</th><th>2024</th><th>2025</th><th>Change</th></tr>
+            </thead>
+            <tbody id="trendBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div><!-- /sa-panel -->
+    <!-- ── LANDFILLS PANEL ── -->
+    <div class="sa-panel" id="landfillsPanel">
+      <div class="sa-header">
+        <div class="sa-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#00d4ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          Landfills — 2025 Status
+        </div>
+        <button class="sa-close" id="landfillsClose" title="Close">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7a8fa8" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="sa-content active" style="padding:14px 16px;gap:10px;overflow-y:auto">
+        <div class="sa-desc">
+          Current status of all identified landfill sites in Lagos State. Gas emission levels are derived from the nearest LGA's 2025 Sentinel-5P data.
+        </div>
+        <div id="landfillsList" style="display:flex;flex-direction:column;gap:10px"></div>
+      </div>
+    </div>
+
+
+
+
+    <!-- ── GAS EMISSIONS PANEL ── -->
+    <div class="sa-panel" id="gasPanel">
+      <div class="sa-header">
+        <div class="sa-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#00d4ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/></svg>
+          Gas Emissions
+        </div>
+        <button class="sa-close" id="gasClose" title="Close">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7a8fa8" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <!-- Sub-tabs -->
+      <div class="sa-tabs">
+        <button class="sa-tab active" data-gas-tab="temporal">Temporal Overview</button>
+        <button class="sa-tab" data-gas-tab="correlation">Gas Correlation</button>
+      </div>
+
+      <!-- Temporal Overview -->
+      <div class="gas-content active" id="gas-temporal">
+        <div class="sa-desc">
+          Statewide average emission levels for all 3 gases (2018–2025). Shows whether Lagos emissions are improving or worsening over time.
+        </div>
+        <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-md);padding:10px;height:220px;position:relative;flex-shrink:0">
+          <canvas id="gasTemporalChart"></canvas>
+        </div>
+        <div class="gas-summary-grid" id="gasSummaryGrid"></div>
+      </div>
+
+      <!-- Gas Correlation -->
+      <div class="gas-content" id="gas-correlation">
+        <div class="sa-desc">
+          Scatter plot of <strong>CH&#8324; vs CO</strong> per LGA for the selected year. LGAs far from the cluster may indicate unusual gas profiles — potential anomaly indicators.
+        </div>
+        <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-md);padding:10px;height:260px;position:relative;flex-shrink:0">
+          <canvas id="gasCorrelationChart"></canvas>
+        </div>
+        <div class="sa-table-wrap">
+          <table class="sa-table" id="correlationTable">
+            <thead><tr><th>LGA</th><th>CH&#8324;</th><th>CO</th><th>NO&#8322;</th><th>ISI</th></tr></thead>
+            <tbody id="correlationBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /main-area -->
+</div><!-- /app-shell -->
+
+
+  <!-- ── ABOUT MODAL ── -->
+  <div class="about-overlay" id="aboutOverlay">
+    <div class="about-modal">
+      <button class="about-close" id="aboutClose">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7a8fa8" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+
+      <div class="about-header">
+        <img src="logo.png" alt="Logo" style="width:48px;height:48px;object-fit:contain;display:block;flex-shrink:0">
+        <div>
+          <h2 class="about-title">Lagos <span>Environmental</span> Risk Dashboard</h2>
+          <p class="about-version">Sentinel-5P &nbsp;·&nbsp; 2018–2025 &nbsp;·&nbsp; Lagos State, Nigeria</p>
+        </div>
+      </div>
+
+      <div class="about-body">
+
+        <div class="about-section">
+          <p>An interactive GIS dashboard for analyzing and visualizing dumpsite gas emissions (CH₄, NO₂, CO) across Lagos State. Built to support environmental monitoring and evidence-based decision-making around landfill impact zones.</p>
+        </div>
+
+        <div class="about-section">
+          <div class="about-section-title">Objectives</div>
+          <div class="about-objectives">
+            <div class="about-obj-item"><span class="about-obj-num">01</span><span>Map existing landfill sites across Lagos State</span></div>
+            <div class="about-obj-item"><span class="about-obj-num">02</span><span>Classify gas emission concentrations and analyze spatial distribution</span></div>
+            <div class="about-obj-item"><span class="about-obj-num">03</span><span>Apply buffer analysis (100m / 500m / 1km) to assess emission impact zones</span></div>
+            <div class="about-obj-item"><span class="about-obj-num">04</span><span>Deliver an interactive GIS dashboard for visualization and analysis</span></div>
+            <div class="about-obj-item"><span class="about-obj-num">05</span><span>Detect anomalous emission areas as indicators of potential unauthorized dumpsites</span></div>
+          </div>
+        </div>
+
+        <div class="about-grid">
+          <div class="about-section">
+            <div class="about-section-title">Data Sources</div>
+            <div class="about-data-list">
+              <div class="about-data-item"><div class="about-data-label">Gas Emissions</div><div class="about-data-val">GEE · Sentinel-5P (2018–2025)</div></div>
+              <div class="about-data-item"><div class="about-data-label">Landfill Sites</div><div class="about-data-val">Google Earth Pro</div></div>
+              <div class="about-data-item"><div class="about-data-label">Boundaries</div><div class="about-data-val">Lagos State LGA Boundaries</div></div>
+              <div class="about-data-item"><div class="about-data-label">Buildings</div><div class="about-data-val">OpenStreetMap / Overpass API</div></div>
+            </div>
+          </div>
+          <div class="about-section">
+            <div class="about-section-title">Gases Monitored</div>
+            <div class="about-gas-list">
+              <div class="about-gas ch4"><span class="about-gas-sym">CH₄</span><div><div class="about-gas-name">Methane</div><div class="about-gas-unit">mol/m²</div></div></div>
+              <div class="about-gas no2"><span class="about-gas-sym">NO₂</span><div><div class="about-gas-name">Nitrogen Dioxide</div><div class="about-gas-unit">mol/m²</div></div></div>
+              <div class="about-gas co"><span class="about-gas-sym">CO</span><div><div class="about-gas-name">Carbon Monoxide</div><div class="about-gas-unit">mol/m²</div></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="about-footer">
+          <div>
+            <div class="about-org">Geoinfotech Resources Limited</div>
+            <div class="about-sub">GIS Analysis · Environmental Monitoring · Lagos State, Nigeria</div>
+          </div>
+          <div class="about-year">2026</div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+      <div class="about-body">
+
+        <!-- Aim -->
+        <div class="about-section">
+          <div class="about-section-title">Aim</div>
+          <p>To analyze and visualize the spatial distribution of gas emissions from dumpsites using an interactive GIS dashboard in Lagos State, Nigeria — strengthening environmental monitoring and informing policy decisions.</p>
+        </div>
+
+        <!-- Problem Statement -->
+        <div class="about-section">
+          <div class="about-section-title">Problem Statement</div>
+          <p>Rapid urbanization in Lagos State has led to significant increases in solid waste generation, resulting in the proliferation of both authorized and unauthorized dumping sites. These sites emit harmful gases including CH₄, CO₂ and other pollutants contributing to environmental degradation, air pollution, and public health risks. A critical gap exists in the inability to systematically detect and monitor unauthorized dumpsites — spatial anomalies in gas concentration may serve as indicators of such activities.</p>
+        </div>
+
+        <!-- Objectives -->
+        <div class="about-section">
+          <div class="about-section-title">Research Objectives</div>
+          <div class="about-objectives">
+            <div class="about-obj-item"><span class="about-obj-num">01</span><span>Identify and map existing dumpsites within Lagos State</span></div>
+            <div class="about-obj-item"><span class="about-obj-num">02</span><span>Estimate and classify gas emission concentrations (CH₄, NO₂, CO) and perform spatial analysis to determine distribution and intensity</span></div>
+            <div class="about-obj-item"><span class="about-obj-num">03</span><span>Apply buffer analysis (100 m / 500 m / 1 km) to assess the spatial extent of gas emission impact around dumpsites</span></div>
+            <div class="about-obj-item"><span class="about-obj-num">04</span><span>Develop an interactive GIS dashboard for visualization and analysis of dumpsite / landfill gas emissions</span></div>
+            <div class="about-obj-item"><span class="about-obj-num">05</span><span>Highlight anomalous high-emission areas that may indicate potential unauthorized dumping sites</span></div>
+          </div>
+        </div>
+
+        <!-- Research Questions -->
+        <div class="about-section">
+          <div class="about-section-title">Research Questions</div>
+          <div class="about-questions">
+            <div class="about-q-item">What is the spatial distribution of dumpsites in Lagos State?</div>
+            <div class="about-q-item">How are gas emissions distributed across different areas within the state?</div>
+            <div class="about-q-item">Which areas exhibit high concentrations of dumpsite-related gas emissions?</div>
+            <div class="about-q-item">What is the spatial extent of environmental impact around identified dumpsites?</div>
+            <div class="about-q-item">Can spatial anomalies in gas concentration serve as indicators of potential unauthorized dumping sites?</div>
+            <div class="about-q-item">How effective is an interactive GIS dashboard in supporting environmental monitoring and decision-making?</div>
+          </div>
+        </div>
+
+        <!-- Data + Gases grid -->
+        <div class="about-grid">
+          <div class="about-section">
+            <div class="about-section-title">Data Sources</div>
+            <div class="about-data-list">
+              <div class="about-data-item"><div class="about-data-label">Gas Emissions</div><div class="about-data-val">GEE · Sentinel-5P (2018–2025)</div></div>
+              <div class="about-data-item"><div class="about-data-label">Landfill Locations</div><div class="about-data-val">Field Survey / Digitization</div></div>
+              <div class="about-data-item"><div class="about-data-label">Admin Boundaries</div><div class="about-data-val">Lagos State LGA Boundaries</div></div>
+              <div class="about-data-item"><div class="about-data-label">Building Footprints</div><div class="about-data-val">OpenStreetMap / Overpass API</div></div>
+            </div>
+          </div>
+          <div class="about-section">
+            <div class="about-section-title">Gases Monitored</div>
+            <div class="about-gas-list">
+              <div class="about-gas ch4"><span class="about-gas-sym">CH₄</span><div><div class="about-gas-name">Methane</div><div class="about-gas-unit">mol/m² (converted from ppb)</div></div></div>
+              <div class="about-gas no2"><span class="about-gas-sym">NO₂</span><div><div class="about-gas-name">Nitrogen Dioxide</div><div class="about-gas-unit">mol/m²</div></div></div>
+              <div class="about-gas co"><span class="about-gas-sym">CO</span><div><div class="about-gas-name">Carbon Monoxide</div><div class="about-gas-unit">mol/m²</div></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Methodology -->
+        <div class="about-section">
+          <div class="about-section-title">Methodology</div>
+          <div class="about-method-steps">
+            <div class="about-step">
+              <div class="about-step-icon">📥</div>
+              <div class="about-step-label">Data Collection</div>
+              <div class="about-step-desc">Sentinel-5P imagery, landfill surveys, admin boundaries, building footprints</div>
+            </div>
+            <div class="about-step-arrow">→</div>
+            <div class="about-step">
+              <div class="about-step-icon">⚙️</div>
+              <div class="about-step-label">Processing</div>
+              <div class="about-step-desc">Georeferencing, coordinate projection, attribute structuring, CH₄ unit conversion</div>
+            </div>
+            <div class="about-step-arrow">→</div>
+            <div class="about-step">
+              <div class="about-step-icon">🔬</div>
+              <div class="about-step-label">Spatial Analysis</div>
+              <div class="about-step-desc">Buffer analysis (100m/500m/1km), anomaly detection (Z-score), zonal classification, overlay analysis</div>
+            </div>
+            <div class="about-step-arrow">→</div>
+            <div class="about-step">
+              <div class="about-step-icon">📊</div>
+              <div class="about-step-label">Visualization</div>
+              <div class="about-step-desc">Interactive choropleth map, trend charts, LGA reports, spatial analysis panel</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scope -->
+        <div class="about-section">
+          <div class="about-section-title">Scope</div>
+          <p>This study covers Lagos State, Nigeria (2018–2025). It focuses on spatial analysis and visualization of gas emissions from landfill sites, incorporating buffer analysis at 100 m, 500 m, and 1 km distances to assess impact zones and building exposure. Anomaly detection uses statistical methods (Z-score) to flag LGAs with emissions significantly above the mean as potential unauthorized dumpsite indicators. Where field measurements are unavailable, modeled and estimated data are used.</p>
+        </div>
+
+        <!-- Limitations -->
+        <div class="about-section">
+          <div class="about-section-title">Limitations</div>
+          <div class="about-questions">
+            <div class="about-q-item">Reliance on estimated/modeled gas emission data where field measurements are unavailable may affect precision</div>
+            <div class="about-q-item">Spatial interpolation techniques are subject to inaccuracy in areas with sparse data points</div>
+            <div class="about-q-item">Emissions from industrial facilities may influence readings and complicate sole attribution to dumpsites</div>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="about-footer">
+          <div>
+            <div class="about-org">Geoinfotech Resources Limited</div>
+            <div class="about-sub">GIS Analysis · Environmental Monitoring · Lagos State, Nigeria</div>
+          </div>
+          <div class="about-year">2026</div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+      <div class="about-body">
+        <div class="about-section">
+          <div class="about-section-title">Overview</div>
+          <p>An interactive GIS dashboard for the spatial analysis and visualization of dumpsite gas emissions across Lagos State, Nigeria. Built to support environmental monitoring, evidence-based decision-making, and research into the distribution and impact of emissions from authorized and unauthorized dumpsites.</p>
+        </div>
+
+        <div class="about-section">
+          <div class="about-section-title">Research Objectives</div>
+          <div class="about-objectives">
+            <div class="about-obj-item">
+              <span class="about-obj-num">01</span>
+              <span>Identify and map existing dumpsites within Lagos State</span>
+            </div>
+            <div class="about-obj-item">
+              <span class="about-obj-num">02</span>
+              <span>Estimate and classify gas emission concentrations (CH₄, NO₂, CO) and analyze spatial distribution</span>
+            </div>
+            <div class="about-obj-item">
+              <span class="about-obj-num">03</span>
+              <span>Apply buffer analysis (100m / 500m / 1km) to assess spatial extent of emission impact</span>
+            </div>
+            <div class="about-obj-item">
+              <span class="about-obj-num">04</span>
+              <span>Develop an interactive GIS dashboard for real-time visualization and analysis</span>
+            </div>
+            <div class="about-obj-item">
+              <span class="about-obj-num">05</span>
+              <span>Highlight anomalous high-emission areas as potential indicators of unauthorized dumpsites</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="about-grid">
+          <div class="about-section">
+            <div class="about-section-title">Data Sources</div>
+            <div class="about-data-list">
+              <div class="about-data-item">
+                <div class="about-data-label">Gas Emissions</div>
+                <div class="about-data-val">Sentinel-5P (2018–2025)</div>
+              </div>
+              <div class="about-data-item">
+                <div class="about-data-label">Dumpsite Locations</div>
+                <div class="about-data-val">Field Survey / Digitization</div>
+              </div>
+              <div class="about-data-item">
+                <div class="about-data-label">Admin Boundaries</div>
+                <div class="about-data-val">Lagos State LGA Boundaries</div>
+              </div>
+              <div class="about-data-item">
+                <div class="about-data-label">Building Footprints</div>
+                <div class="about-data-val">OpenStreetMap / Overpass API</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="about-section">
+            <div class="about-section-title">Gases Monitored</div>
+            <div class="about-gas-list">
+              <div class="about-gas ch4">
+                <span class="about-gas-sym">CH₄</span>
+                <div>
+                  <div class="about-gas-name">Methane</div>
+                  <div class="about-gas-unit">mol/m² (converted from ppb)</div>
+                </div>
+              </div>
+              <div class="about-gas no2">
+                <span class="about-gas-sym">NO₂</span>
+                <div>
+                  <div class="about-gas-name">Nitrogen Dioxide</div>
+                  <div class="about-gas-unit">mol/m²</div>
+                </div>
+              </div>
+              <div class="about-gas co">
+                <span class="about-gas-sym">CO</span>
+                <div>
+                  <div class="about-gas-name">Carbon Monoxide</div>
+                  <div class="about-gas-unit">mol/m²</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="about-section">
+          <div class="about-section-title">Methodology</div>
+          <div class="about-method-steps">
+            <div class="about-step">
+              <div class="about-step-icon">📥</div>
+              <div class="about-step-label">Data Collection</div>
+              <div class="about-step-desc">Satellite imagery, dumpsite surveys, admin boundaries</div>
+            </div>
+            <div class="about-step-arrow">→</div>
+            <div class="about-step">
+              <div class="about-step-icon">⚙️</div>
+              <div class="about-step-label">Processing</div>
+              <div class="about-step-desc">Georeferencing, projection, attribute structuring</div>
+            </div>
+            <div class="about-step-arrow">→</div>
+            <div class="about-step">
+              <div class="about-step-icon">🔬</div>
+              <div class="about-step-label">Spatial Analysis</div>
+              <div class="about-step-desc">Buffer analysis, anomaly detection, zonal classification</div>
+            </div>
+            <div class="about-step-arrow">→</div>
+            <div class="about-step">
+              <div class="about-step-icon">📊</div>
+              <div class="about-step-label">Visualization</div>
+              <div class="about-step-desc">Interactive GIS dashboard, trend charts, reports</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="about-footer">
+          <div>
+            <div class="about-org">Geoinfotech Resources Limited</div>
+            <div class="about-sub">GIS Analysis · Environmental Monitoring · Lagos State, Nigeria</div>
+          </div>
+          <div class="about-year">2026</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+
+<script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://unpkg.com/georaster@1.6.0/dist/georaster.browser.bundle.min.js"></script>
+<script src="https://unpkg.com/georaster-layer-for-leaflet@2.0.0/dist/georaster-layer-for-leaflet.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
