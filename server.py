@@ -10,6 +10,7 @@ Run: python server.py
 """
 
 import os, json
+from datetime import date
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import ee
@@ -53,23 +54,115 @@ ASSETS = {
     'landfills': 'projects/ee-bolaewenla66/assets/landfills',
 }
 
-YEARS = list(range(2018, 2026))
+IMAGE_ASSETS = {
+    'stack': os.environ.get('GEE_STACK_ASSET_TEMPLATE', 'projects/ee-bolaewenla66/assets/Lagos_Gases_{year}'),
+    'ch4': os.environ.get('GEE_CH4_ASSET_TEMPLATE', 'projects/ee-bolaewenla66/assets/CH4_{year}'),
+    'no2': os.environ.get('GEE_NO2_ASSET_TEMPLATE', 'projects/ee-bolaewenla66/assets/NO2_{year}'),
+    'co': os.environ.get('GEE_CO_ASSET_TEMPLATE', 'projects/ee-bolaewenla66/assets/CO_{year}'),
+    'isi': os.environ.get('GEE_ISI_ASSET_TEMPLATE', 'projects/ee-bolaewenla66/assets/ISI_{year}'),
+    'hotspots': os.environ.get('GEE_HOTSPOTS_ASSET_TEMPLATE', 'projects/ee-bolaewenla66/assets/Hotspots_{year}'),
+}
+
+START_YEAR = 2018
+YEARS = list(range(START_YEAR, date.today().year + 1))
+CACHE_VERSION = 'aoi-mask-v2'
 
 # ── Cached objects ────────────────────────────────────────
-_cache        = {}
-_extent_cache = None
-_lga_cache    = {}  # year → LGA stats
-_ward_cache   = {}  # year → ward stats
+_cache           = {}
+_extent_cache    = None
+_state_mask_cache = {}
+_aoi_fc_cache    = None
+_lga_fc_cache    = None
+_wards_fc_cache  = None
+_landfills_fc_cache = None
+_lga_cache       = {}  # year → LGA stats
+_ward_cache      = {}  # year → ward stats
+
+# ── Asset helpers — single load point for every FC ───────
+def get_lga_fc():
+    global _lga_fc_cache
+    if _lga_fc_cache is None:
+        _lga_fc_cache = ee.FeatureCollection(ASSETS['lga'])
+    return _lga_fc_cache
+
+def get_aoi_fc():
+    """Local Lagos AOI boundary used for raster clipping."""
+    global _aoi_fc_cache
+    if _aoi_fc_cache is None:
+        path = os.path.join(DATA_DIR, 'lga_boundary.geojson')
+        if os.path.exists(path):
+            with open(path, 'r', encoding='utf-8') as f:
+                _aoi_fc_cache = ee.FeatureCollection(json.load(f).get('features', []))
+        else:
+            _aoi_fc_cache = get_lga_fc()
+    return _aoi_fc_cache
+
+def get_wards_fc():
+    global _wards_fc_cache
+    if _wards_fc_cache is None:
+        _wards_fc_cache = ee.FeatureCollection(ASSETS['wards'])
+    return _wards_fc_cache
+
+def get_landfills_fc():
+    global _landfills_fc_cache
+    if _landfills_fc_cache is None:
+        _landfills_fc_cache = ee.FeatureCollection(ASSETS['landfills'])
+    return _landfills_fc_cache
 
 def get_lagos_extent():
+    """Dissolved Lagos state boundary (ee.Geometry) — for clipping."""
     global _extent_cache
     if _extent_cache is None:
-        _extent_cache = ee.FeatureCollection(ASSETS['lga']).geometry().dissolve()
+        _extent_cache = get_aoi_fc().geometry().dissolve()
     return _extent_cache
 
+def get_state_mask():
+    """Painted binary mask image from the dissolved LGA boundary — clean tile edges."""
+    if 'mask' not in _state_mask_cache:
+        _state_mask_cache['mask'] = ee.Image.constant(0).byte().paint(get_aoi_fc(), 1).selfMask()
+    return _state_mask_cache['mask']
+
+def mask_to_aoi(img, geometry=None):
+    """Clip an image and hide pixels outside the AOI boundary."""
+    geom = geometry or get_lagos_extent()
+    mask = get_state_mask().reproject(crs=img.projection(), scale=1000)
+    return img.clip(geom).updateMask(mask)
+
+def format_image_asset(template, metric, year):
+    return template.format(year=year, metric=metric, metric_upper=metric.upper())
+
+def get_asset_image(metric, year, asset_key=None):
+    key = asset_key or metric
+    if key not in IMAGE_ASSETS:
+        raise ValueError(f'Unknown image asset key: {key}')
+
+    asset_id = format_image_asset(IMAGE_ASSETS[key], metric, year)
+    img = ee.Image(asset_id)
+
+    if key == 'stack':
+        band_names = img.bandNames()
+        preferred = {
+            'ch4': ['ch4', 'CH4', 'CH4_column_volume_mixing_ratio_dry_air'],
+            'no2': ['no2', 'NO2', 'tropospheric_NO2_column_number_density'],
+            'co': ['co', 'CO', 'CO_column_number_density'],
+            'isi': ['isi', 'ISI'],
+            'hotspots': ['hotspots', 'Hotspots', 'HOTSPOTS'],
+        }.get(metric, [metric])
+
+        selected = ee.String(band_names.get(0))
+        for band in reversed(preferred):
+            selected = ee.Algorithms.If(band_names.contains(band), band, selected)
+        selected = ee.String(selected)
+        img = img.select(selected).rename(metric)
+    else:
+        img = img.select(0).rename(metric)
+
+    if metric == 'no2':
+        img = img.max(ee.Image(0)).rename(metric)
+    return mask_to_aoi(img)
+
 def get_distance_raster():
-    landfills = ee.FeatureCollection(ASSETS['landfills'])
-    return landfills.distance(10000).clip(get_lagos_extent())
+    return mask_to_aoi(get_landfills_fc().distance(10000))
 
 # ── Core functions — mirrors GEE script exactly ───────────
 def get_yearly_gases(year, mask_geometry):
@@ -96,7 +189,7 @@ def get_yearly_gases(year, mask_geometry):
           .select('CO_column_number_density')
           .filterDate(start, end).filterBounds(mask_geometry), 'co')
 
-    return ee.Image.cat([ch4, no2, co]).clip(mask_geometry)
+    return mask_to_aoi(ee.Image.cat([ch4, no2, co]), mask_geometry)
 
 def compute_isi(gases, mask_geometry):
     ch4_norm = gases.select('ch4').unitScale(1750, 1950).clamp(0, 1)
@@ -120,13 +213,13 @@ def build_stack(year, mask_geometry):
     gases = get_yearly_gases(year, mask_geometry)
     isi   = compute_isi(gases, mask_geometry)
     hspot = compute_hotspots(isi, mask_geometry)
-    return ee.Image.cat([
+    return mask_to_aoi(ee.Image.cat([
         gases.select('ch4').toFloat(),
         gases.select('no2').toFloat(),
         gases.select('co').toFloat(),
         isi.toFloat(),
         hspot.toFloat()
-    ])
+    ]), mask_geometry)
 
 # ── Vis params ────────────────────────────────────────────
 VIS = {
@@ -149,9 +242,19 @@ def health():
 
 
 # ── Raster tiles ─────────────────────────────────────────
+@app.route('/gee-assets')
+def get_gee_assets():
+    return jsonify({
+        'feature_assets': ASSETS,
+        'image_asset_templates': IMAGE_ASSETS,
+        'years': YEARS,
+        'metrics': list(VIS.keys()),
+    })
+
+
 @app.route('/tiles/<metric>/<int:year>')
 def get_tiles(metric, year):
-    key = f'{metric}_{year}'
+    key = f'{CACHE_VERSION}_{metric}_{year}'
     if key in _cache:
         return jsonify({'url':_cache[key], 'cached':True})
     try:
@@ -169,8 +272,7 @@ def get_tiles(metric, year):
             return jsonify({'error':f'Unknown metric: {metric}'}), 400
 
         # Create binary mask from LGA boundary polygon — pixels outside = 0
-        lga_mask = ee.Image.constant(1).clip(extent).mask()
-        img      = img.clip(extent).updateMask(lga_mask)
+        img = mask_to_aoi(img, extent)
         map_id = img.getMapId(VIS[metric])
         url    = get_tile_url(map_id)
         _cache[key] = url
@@ -182,6 +284,26 @@ def get_tiles(metric, year):
 
 
 # ── LGA stats — mirrors processRegion(lga) ───────────────
+@app.route('/asset-tiles/<metric>/<int:year>')
+def get_asset_tiles(metric, year):
+    asset_key = request.args.get('asset', metric)
+    key = f'{CACHE_VERSION}_asset_{asset_key}_{metric}_{year}'
+    if key in _cache:
+        return jsonify({'url': _cache[key], 'cached': True, 'asset': asset_key})
+    try:
+        if metric not in VIS:
+            return jsonify({'error': f'Unknown metric: {metric}'}), 400
+        img = get_asset_image(metric, year, asset_key)
+        map_id = img.getMapId(VIS[metric])
+        url = get_tile_url(map_id)
+        _cache[key] = url
+        print(f'Asset tiles: {asset_key}/{metric}/{year}')
+        return jsonify({'url': url, 'asset': asset_key, 'metric': metric, 'year': year})
+    except Exception as e:
+        print(f'Asset tiles {asset_key}/{metric}/{year}: {e}')
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/lga-stats/<int:year>')
 def get_lga_stats(year):
     """

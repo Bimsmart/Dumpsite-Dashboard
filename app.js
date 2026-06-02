@@ -6,7 +6,8 @@
 const app = {
   // State
   state: {
-    currentYear: '2025',
+    currentYear: String(new Date().getFullYear()),
+    availableYears: ['2018','2019','2020','2021','2022','2023','2024','2025'],
     currentMetric: 'ch4',
     currentBasemap: 'carto',
     currentLGA: '',
@@ -23,6 +24,8 @@ const app = {
     clickedPoint: null,
     geeMode: false,  // true when server.py is running
     GEE_SERVER: 'http://localhost:5001',
+    geeRasterSource: 'asset',
+    geeTileEndpointTemplate: null,
   },
 
   // Map and Chart instances
@@ -125,15 +128,68 @@ const app = {
     Chart.defaults.font.size   = 10;
   },
 
+  getYears() {
+    return this.state.availableYears || ['2018','2019','2020','2021','2022','2023','2024','2025'];
+  },
+
+  getLatestYear() {
+    const years = this.getYears();
+    return years[years.length - 1] || String(new Date().getFullYear());
+  },
+
+  setAvailableYears(years) {
+    const cleanYears = [...new Set((years || []).map(String))]
+      .filter(y => /^\d{4}$/.test(y))
+      .sort();
+    if (!cleanYears.length) return;
+
+    this.state.availableYears = cleanYears;
+    if (!cleanYears.includes(String(this.state.currentYear))) {
+      this.state.currentYear = this.getLatestYear();
+    }
+
+    const yearSelect = document.getElementById('yearSelect');
+    if (yearSelect) {
+      yearSelect.innerHTML = '';
+      cleanYears.forEach(year => {
+        const option = document.createElement('option');
+        option.value = year;
+        option.textContent = year;
+        option.selected = year === String(this.state.currentYear);
+        yearSelect.appendChild(option);
+      });
+    }
+
+    const first = cleanYears[0];
+    const last = this.getLatestYear();
+    const fromSlider = document.getElementById('sa-trend-from');
+    const toSlider = document.getElementById('sa-trend-to');
+    if (fromSlider) {
+      fromSlider.min = first;
+      fromSlider.max = last;
+      if (!cleanYears.includes(String(fromSlider.value))) fromSlider.value = first;
+    }
+    if (toSlider) {
+      toSlider.min = first;
+      toSlider.max = last;
+      if (!cleanYears.includes(String(toSlider.value)) || Number(toSlider.value) < Number(first)) toSlider.value = last;
+    }
+    const fromLabel = document.getElementById('trendFromLabel');
+    const toLabel = document.getElementById('trendToLabel');
+    if (fromLabel && fromSlider) fromLabel.textContent = fromSlider.value;
+    if (toLabel && toSlider) toLabel.textContent = toSlider.value;
+  },
+
   // Initialize application
   async init() {
     console.log('Initializing...');
     this.initChartDefaults();
-    await this.initGEEMode();
+    this.setAvailableYears(this.getYears());
     await this.loadData();
     this.initializeMap();
     this.attachEventListeners();
     this.updateDashboard();
+    await this.initGEEMode();
   },
 
   // Load GeoJSON data
@@ -610,7 +666,7 @@ const app = {
 
   // Update trend line chart
   updateTrendChart() {
-    const years = ['2018', '2019', '2020', '2021', '2022', '2023', '2024', '2025'];
+    const years = this.getYears();
     const metric = this.state.currentMetric;
     const avgValues = [];
 
@@ -1465,7 +1521,7 @@ const app = {
 
   renderGasTemporal() {
     if (!this.state.data.lgas) return;
-    const years   = ['2018','2019','2020','2021','2022','2023','2024','2025'];
+    const years   = this.getYears();
     const metrics = [
       { key:'ch4', label:'CH₄', color:'#3b82f6', bg:'rgba(59,130,246,0.08)' },
       { key:'no2', label:'NO₂', color:'#10b981', bg:'rgba(16,185,129,0.08)' },
@@ -1512,8 +1568,9 @@ const app = {
     const grid = document.getElementById('gasSummaryGrid');
     if (!grid) return;
     grid.innerHTML = metrics.map(m => {
-      const v2025 = datasets.find(d => d.label === m.label).data[7];
-      const v2018 = datasets.find(d => d.label === m.label).data[0];
+      const series = datasets.find(d => d.label === m.label).data;
+      const v2025 = series[series.length - 1] || 0;
+      const v2018 = series[0] || 0;
       const pct   = v2018 > 0 ? ((v2025 - v2018) / v2018 * 100).toFixed(1) : 0;
       const up    = pct > 0;
       return `<div class="gas-sum-card">
@@ -1637,14 +1694,25 @@ const app = {
     try {
       const resp = await fetch('http://localhost:5001/health', { signal: AbortSignal.timeout(2000) });
       if (resp.ok) {
+        const health = await resp.json();
+        if (Array.isArray(health.years)) {
+          const wasOnLatestYear = String(this.state.currentYear) === this.getLatestYear();
+          this.setAvailableYears(health.years);
+          if (wasOnLatestYear) {
+            this.state.currentYear = this.getLatestYear();
+            this.setAvailableYears(this.getYears());
+          }
+        }
         this.state.geeMode = true;
         console.log('✅ GEE server detected — using live tiles');
         const indicator = document.getElementById('gee-indicator');
         if (indicator) indicator.style.display = 'flex';
         const badge = document.getElementById('gee-layer-badge');
         if (badge) badge.style.display = 'inline';
-        // Load LGA data from GEE
-        await this.loadDataFromGEE();
+        // Load GEE stats in the background; local GeoJSON keeps startup fast.
+        this.loadDataFromGEE().then((loaded) => {
+          if (loaded) this.updateDashboard();
+        });
       }
     } catch(e) {
       this.state.geeMode = false;
@@ -1653,10 +1721,34 @@ const app = {
   },
 
   async getGEETileURL(metric, year) {
-    const resp = await fetch(`${this.state.GEE_SERVER}/tiles/${metric}/${year}`);
-    const data = await resp.json();
-    if (data.error) throw new Error(data.error);
-    return data.url;
+    const endpointTemplate = this.state.geeTileEndpointTemplate;
+    const endpoints = endpointTemplate
+      ? [endpointTemplate.replace('{metric}', metric).replace('{year}', year)]
+      : this.state.geeRasterSource === 'computed'
+      ? [`tiles/${metric}/${year}`]
+      : [`asset-tiles/${metric}/${year}?asset=stack`, `asset-tiles/${metric}/${year}`, `tiles/${metric}/${year}`];
+
+    let lastError = null;
+    for (const endpoint of endpoints) {
+      try {
+        const resp = await fetch(`${this.state.GEE_SERVER}/${endpoint}`, {
+          signal: AbortSignal.timeout(12000),
+        });
+        const data = await resp.json();
+        if (resp.ok && !data.error && data.url) {
+          if (!this.state.geeTileEndpointTemplate) {
+            this.state.geeTileEndpointTemplate = endpoint
+              .replace(metric, '{metric}')
+              .replace(String(year), '{year}');
+          }
+          return data.url;
+        }
+        lastError = data.error || `GEE tile request failed: ${endpoint}`;
+      } catch (e) {
+        lastError = e.message;
+      }
+    }
+    throw new Error(lastError || 'GEE tile request failed');
   },
 
   async getGEEPixelValues(lat, lng, year) {
@@ -1672,7 +1764,7 @@ const app = {
 
   async loadDataFromGEE() {
     // Load all 8 years of LGA stats from GEE in parallel
-    const years = ['2018','2019','2020','2021','2022','2023','2024','2025'];
+    const years = this.getYears();
     const statusEl = document.getElementById('gee-indicator');
 
     try {
@@ -1750,6 +1842,20 @@ const app = {
       this.updateCharts();
       this.updateKPIs();
     }
+  },
+
+  getAOIMask() {
+    const boundary = this.state.data.lgasBoundary;
+    if (!boundary?.features?.length) return null;
+    return boundary.features.length === 1 ? boundary.features[0] : boundary;
+  },
+
+  isPointInsideAOI(lat, lng) {
+    if (!this.state.data.lgasBoundary || !window.turf) return true;
+    const pt = window.turf.point([lng, lat]);
+    return this.state.data.lgasBoundary.features.some(f => {
+      try { return window.turf.booleanPointInPolygon(pt, f); } catch(e) { return false; }
+    });
   },
 
   async loadRaster(year) {
@@ -1843,6 +1949,7 @@ const app = {
     if (!georaster) return;
 
     const bandIdx = this.BAND_INDEX[metric] ?? 0;
+    const aoiMask = this.getAOIMask();
 
     // Colour scales per metric
     const scales = {
@@ -1886,7 +1993,7 @@ const app = {
       this.setupGEEClickHandler();
     } else {
       // ── Local GeoTIFF fallback ──────────────────────────
-      this.layers.raster = new GeoRasterLayer({
+      const rasterOptions = {
         georaster,
         opacity: 0.75,
         band: bandIdx,
@@ -1896,7 +2003,12 @@ const app = {
           return getColor(val);
         },
         resolution: 256,
-      });
+      };
+      if (aoiMask) {
+        rasterOptions.mask = aoiMask;
+        rasterOptions.mask_strategy = 'inside';
+      }
+      this.layers.raster = new GeoRasterLayer(rasterOptions);
       if (document.getElementById('rasterLayer')?.checked) {
         this.layers.raster.addTo(this.map);
         if (this.layers.lgas)   this.layers.lgas.bringToFront();
@@ -1912,6 +2024,7 @@ const app = {
     this._geeClickHandler = async (e) => {
       if (!document.getElementById('rasterLayer')?.checked) return;
       const { lat, lng } = e.latlng;
+      if (!this.isPointInsideAOI(lat, lng)) return;
       const year = parseInt(this.state.currentYear);
 
       const mapTip = document.querySelector('.map-tip');
@@ -1977,6 +2090,7 @@ const app = {
     this._rasterClickHandler = async (e) => {
       if (!document.getElementById('rasterLayer')?.checked) return;
       const { lat, lng } = e.latlng;
+      if (!this.isPointInsideAOI(lat, lng)) return;
 
       // Check if click is within raster bounds
       const { xmin, xmax, ymin, ymax } = georaster;
@@ -2042,7 +2156,7 @@ const app = {
   },
 
   async updateChartsForPoint(lat, lng, currentGeoraster) {
-    const years  = ['2018','2019','2020','2021','2022','2023','2024','2025'];
+    const years  = this.getYears();
     const metric = this.state.currentMetric;
     const bandIdx = this.BAND_INDEX[metric] ?? 0;
     const ch4Band = 0;
@@ -2082,7 +2196,7 @@ const app = {
     }
 
     // Update composition donut with point values for current year
-    const yr = parseInt(this.state.currentYear) - 2018;
+    const yr = years.indexOf(String(this.state.currentYear));
     const c4 = pointVals.ch4[yr] || 0;
     const n2 = pointVals.no2[yr] || 0;
     const cc = pointVals.co[yr]  || 0;
@@ -2213,7 +2327,7 @@ const app = {
     const yoy = prevCH4 !== 0 ? ((ch4-prevCH4)/prevCH4*100).toFixed(1) : 'N/A';
     const riskColors = { low:'#16a34a', moderate:'#ca8a04', elevated:'#f97316', high:'#dc2626', critical:'#7c2d12' };
     const riskColor  = riskColors[risk.css] || '#888';
-    const years = ['2018','2019','2020','2021','2022','2023','2024','2025'];
+    const years = this.getYears();
     const tCH4 = years.map(y=>this.getMetricValue(feature,'ch4',y)||0);
     const tNO2 = years.map(y=>this.getMetricValue(feature,'no2',y)||0);
     const tCO  = years.map(y=>this.getMetricValue(feature,'co', y)||0);
