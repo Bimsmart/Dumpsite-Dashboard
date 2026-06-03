@@ -26,6 +26,9 @@ const app = {
     GEE_SERVER: 'http://localhost:5001',
     geeRasterSource: 'asset',
     geeTileEndpointTemplate: null,
+    theme: 'dark',
+    drawnItems: null,
+    activeDraw: null,
   },
 
   // Map and Chart instances
@@ -37,6 +40,7 @@ const app = {
     miniTrend: null,
     gasTemporal: null,
     gasCorrelation: null,
+    transect: null,
   },
   layers: {
     basemap: null,
@@ -128,6 +132,68 @@ const app = {
     Chart.defaults.font.size   = 10;
   },
 
+  setTheme(theme) {
+    this.state.theme = theme;
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('erm-theme', theme);
+
+    // Update theme button active state
+    document.querySelectorAll('.theme-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.theme === theme);
+    });
+
+    // Update Chart.js defaults per theme
+    const chartColors = {
+      dark:    { color: '#7a8fa8', border: 'rgba(255,255,255,0.05)' },
+      light:   { color: '#475569', border: 'rgba(0,0,0,0.08)' },
+      modern:  { color: '#9d8fc4', border: 'rgba(255,255,255,0.06)' },
+    };
+    const c = chartColors[theme] || chartColors.dark;
+    Chart.defaults.color       = c.color;
+    Chart.defaults.borderColor = c.border;
+
+    // Re-render existing charts so they pick up new colors
+    Object.values(this.charts).forEach(chart => {
+      if (chart) {
+        if (chart.options.scales) {
+          Object.values(chart.options.scales).forEach(scale => {
+            if (scale.grid)  scale.grid.color  = c.border;
+            if (scale.ticks) scale.ticks.color = c.color;
+          });
+        }
+        chart.update('none');
+      }
+    });
+
+    // Switch basemap: light → OpenStreetMap, dark/modern → Carto Dark
+    if (this.map) {
+      const targetBasemap = theme === 'light' ? 'osm' : 'carto';
+      if (this.state.currentBasemap !== targetBasemap) {
+        this.addBasemap(targetBasemap);
+        const sel = document.getElementById('basemapSelect');
+        if (sel) sel.value = targetBasemap;
+      }
+    }
+
+    // No stroke on donut chart in light theme
+    if (this.charts.composition) {
+      const bw = theme === 'light' ? 0 : 2;
+      const bc = theme === 'light' ? 'transparent' : '#0d1627';
+      this.charts.composition.data.datasets[0].borderWidth = bw;
+      this.charts.composition.data.datasets[0].borderColor = bc;
+      this.charts.composition.update('none');
+    }
+
+    // No stroke on trend chart point circles in light theme
+    if (this.charts.trend) {
+      const ptBw = theme === 'light' ? 0 : 2;
+      const ptBc = theme === 'light' ? 'transparent' : '#070c14';
+      this.charts.trend.data.datasets[0].pointBorderWidth = ptBw;
+      this.charts.trend.data.datasets[0].pointBorderColor = ptBc;
+      this.charts.trend.update('none');
+    }
+  },
+
   getYears() {
     return this.state.availableYears || ['2018','2019','2020','2021','2022','2023','2024','2025'];
   },
@@ -184,10 +250,12 @@ const app = {
   async init() {
     console.log('Initializing...');
     this.initChartDefaults();
+    this.setTheme(localStorage.getItem('erm-theme') || 'dark');
     this.setAvailableYears(this.getYears());
     await this.loadData();
     this.initializeMap();
     this.attachEventListeners();
+    this.initDrawTools();
     this.updateDashboard();
     await this.initGEEMode();
   },
@@ -242,8 +310,11 @@ const app = {
       maxBoundsViscosity: 0.8
     }).setView([6.52, 3.38], 11);
 
-    // Add basemap
-    this.addBasemap('carto');
+    // Add basemap: light theme defaults to OpenStreetMap, dark/modern to Carto Dark
+    const initialBasemap = this.state.theme === 'light' ? 'osm' : 'carto';
+    this.addBasemap(initialBasemap);
+    const basemapSel = document.getElementById('basemapSelect');
+    if (basemapSel) basemapSel.value = initialBasemap;
 
     // Add data layers
     this.addLGALayer();
@@ -606,10 +677,31 @@ const app = {
       document.getElementById('stat-no2').textContent = no2 ? no2.toFixed(6) + ' mol/m²' : '-';
       document.getElementById('stat-co').textContent  = co  ? co.toFixed(6)  + ' mol/m²' : '-';
       let nearestDist = null, nearestName = null;
-      // Use clicked pixel point if in raster mode, otherwise LGA centroid
-      const refPoint = this.state.clickedPoint
-        ? L.latLng(this.state.clickedPoint.lat, this.state.clickedPoint.lng)
-        : (feature.geometry ? L.latLng(feature.geometry.coordinates[1], feature.geometry.coordinates[0]) : null);
+      // Resolve reference point: raster click → boundary polygon centroid → point geometry
+      let refPoint = null;
+      if (this.state.clickedPoint) {
+        refPoint = L.latLng(this.state.clickedPoint.lat, this.state.clickedPoint.lng);
+      } else {
+        const lgaName = feature.properties.lganame;
+        const boundary = this.state.data.lgasBoundary?.features?.find(b => b.properties.lganame === lgaName);
+        const geom = boundary?.geometry || feature.geometry;
+        if (geom) {
+          if (geom.type === 'Point') {
+            refPoint = L.latLng(geom.coordinates[1], geom.coordinates[0]);
+          } else {
+            const ring = geom.type === 'Polygon'
+              ? geom.coordinates[0]
+              : geom.type === 'MultiPolygon'
+              ? geom.coordinates[0]?.[0]
+              : null;
+            if (ring?.length) {
+              const avgLon = ring.reduce((s, c) => s + c[0], 0) / ring.length;
+              const avgLat = ring.reduce((s, c) => s + c[1], 0) / ring.length;
+              refPoint = L.latLng(avgLat, avgLon);
+            }
+          }
+        }
+      }
       if (refPoint && this.state.data.landfills) {
         this.state.data.landfills.features.forEach(lf => {
           if (!lf.geometry) return;
@@ -657,6 +749,33 @@ const app = {
 
 
 
+  // Returns LGA features whose centroid falls within the current map viewport
+  getVisibleLGAFeatures() {
+    if (!this.map || !this.state.data.lgas) return this.state.data.lgas?.features || [];
+    const bounds = this.map.getBounds();
+    return this.state.data.lgas.features.filter(f => {
+      if (!f.geometry) return false;
+      let lon, lat;
+      if (f.geometry.type === 'Point') {
+        [lon, lat] = f.geometry.coordinates;
+      } else {
+        const boundary = this.state.data.lgasBoundary?.features?.find(
+          b => b.properties.lganame === f.properties.lganame
+        );
+        const geom = boundary?.geometry || f.geometry;
+        const ring = geom.type === 'Polygon'
+          ? geom.coordinates[0]
+          : geom.type === 'MultiPolygon'
+          ? geom.coordinates[0]?.[0]
+          : null;
+        if (!ring) return true;
+        lon = ring.reduce((s, c) => s + c[0], 0) / ring.length;
+        lat = ring.reduce((s, c) => s + c[1], 0) / ring.length;
+      }
+      return bounds.contains(L.latLng(lat, lon));
+    });
+  },
+
   // Update all charts
   updateCharts() {
     this.updateTrendChart();
@@ -669,22 +788,28 @@ const app = {
     const years = this.getYears();
     const metric = this.state.currentMetric;
     const avgValues = [];
+    const visibleFeats = this.getVisibleLGAFeatures();
+    const featCount = visibleFeats.length || 1;
 
     years.forEach((year) => {
-      const total = this.state.data.lgas.features.reduce((sum, feature) => {
+      const total = visibleFeats.reduce((sum, feature) => {
         const value = this.getMetricValue(feature, metric, year);
         return sum + (value || 0);
       }, 0);
-      const avg = total / this.state.data.lgas.features.length;
+      const avg = total / featCount;
       avgValues.push(avg.toFixed(2));
     });
 
     const ctx = document.getElementById('trendChart');
     const metricLabelTrend = { ch4: 'CH₄', no2: 'NO₂', co: 'CO' }[metric] || metric.toUpperCase();
+    const ptBorderWidth = this.state.theme === 'light' ? 0 : 2;
+    const ptBorderColor = this.state.theme === 'light' ? 'transparent' : '#070c14';
     if (this.charts.trend) {
       this.charts.trend.data.labels = years;
       this.charts.trend.data.datasets[0].data = avgValues;
       this.charts.trend.data.datasets[0].label = `Average ${metricLabelTrend}`;
+      this.charts.trend.data.datasets[0].pointBorderWidth = ptBorderWidth;
+      this.charts.trend.data.datasets[0].pointBorderColor = ptBorderColor;
       this.charts.trend.options.scales.y.title.text = metricLabelTrend;
       this.charts.trend.update();
     } else {
@@ -703,8 +828,8 @@ const app = {
               tension: 0.4,
               pointRadius: 6,
               pointBackgroundColor: '#00d4ff',
-              pointBorderColor: '#070c14',
-              pointBorderWidth: 2,
+              pointBorderColor: ptBorderColor,
+              pointBorderWidth: ptBorderWidth,
             },
           ],
         },
@@ -788,14 +913,19 @@ const app = {
     const year = this.state.currentYear;
     const metrics = ['ch4', 'no2', 'co'];
     const totals = {};
+    const visibleFeats = this.getVisibleLGAFeatures();
 
     metrics.forEach((metric) => {
-      const total = this.state.data.lgas.features.reduce((sum, feature) => {
+      const total = visibleFeats.reduce((sum, feature) => {
         const value = this.getMetricValue(feature, metric, year);
         return sum + (value || 0);
       }, 0);
       totals[metric] = total;
     });
+
+    const isLight = this.state.theme === 'light';
+    const borderWidth = isLight ? 0 : 2;
+    const borderColor = isLight ? 'transparent' : '#0d1627';
 
     const ctx = document.getElementById('compositionChart');
     const compTitle = document.getElementById('comp-chart-title');
@@ -806,6 +936,8 @@ const app = {
         totals.no2,
         totals.co,
       ];
+      this.charts.composition.data.datasets[0].borderWidth = borderWidth;
+      this.charts.composition.data.datasets[0].borderColor = borderColor;
       this.charts.composition.update();
     } else {
       this.charts.composition = new Chart(ctx, {
@@ -816,8 +948,8 @@ const app = {
             {
               data: [totals.ch4, totals.no2, totals.co],
               backgroundColor: ['#3b82f6', '#10b981', '#f59e0b'],
-              borderColor: '#0d1627',
-              borderWidth: 2,
+              borderColor: borderColor,
+              borderWidth: borderWidth,
             },
           ],
         },
@@ -933,6 +1065,10 @@ const app = {
 
     document.getElementById('basemapSelect').addEventListener('change', (e) => {
       this.addBasemap(e.target.value);
+    });
+
+    document.querySelectorAll('.theme-btn').forEach(btn => {
+      btn.addEventListener('click', () => this.setTheme(btn.dataset.theme));
     });
 
     document.getElementById('lgaBoundaries').addEventListener('change', (e) => {
@@ -1064,6 +1200,15 @@ const app = {
       });
     });
 
+    // Gas correlation axis selectors
+    ['gas-corr-x', 'gas-corr-y'].forEach(id => {
+      document.getElementById(id)?.addEventListener('change', () => {
+        if (document.getElementById('gas-correlation')?.classList.contains('active')) {
+          this.renderGasCorrelation();
+        }
+      });
+    });
+
     document.getElementById('aboutOverlay')?.addEventListener('click', (e) => {
       if (e.target === e.currentTarget) this.closeAbout();
     });
@@ -1111,6 +1256,13 @@ const app = {
       if (e.key === 'Enter') {
         this.searchLocation();
       }
+    });
+
+    // Refresh trend + composition charts whenever the map is panned or zoomed
+    this.map.on('moveend', () => {
+      if (!this.state.data.lgas) return;
+      this.updateTrendChart();
+      this.updateCompositionChart();
     });
   },
 
@@ -1589,11 +1741,20 @@ const app = {
     const year  = this.state.currentYear;
     const feats = this.state.data.lgas.features;
 
-    // Build scatter data: x=CH4, y=CO, label=LGA name
+    const xKey = document.getElementById('gas-corr-x')?.value || 'ch4';
+    const yKey = document.getElementById('gas-corr-y')?.value || 'co';
+    const gasLabels  = { ch4: 'CH₄', no2: 'NO₂', co: 'CO' };
+    const gasColors  = { ch4: '#3b82f6', no2: '#10b981', co: '#f59e0b' };
+    const xLabel = gasLabels[xKey] || xKey.toUpperCase();
+    const yLabel = gasLabels[yKey] || yKey.toUpperCase();
+    const allKeys = ['ch4', 'no2', 'co'];
+    const thirdKey = allKeys.find(g => g !== xKey && g !== yKey) || null;
+    const thirdLabel = thirdKey ? gasLabels[thirdKey] : null;
+
+    // Build scatter points using the selected X / Y gases
     const points = feats.map(f => ({
-      x:    this.getMetricValue(f, 'ch4', year) || 0,
-      y:    this.getMetricValue(f, 'co',  year) || 0,
-      no2:  this.getMetricValue(f, 'no2', year) || 0,
+      x:    this.getMetricValue(f, xKey, year) || 0,
+      y:    this.getMetricValue(f, yKey, year) || 0,
       isi:  f.properties[`isi_${year}`] || 0,
       name: f.properties.lganame,
     })).filter(p => p.x > 0 && p.y > 0);
@@ -1604,14 +1765,12 @@ const app = {
     const stdX  = Math.sqrt(points.reduce((s,p) => s+Math.pow(p.x-meanX,2),0)/points.length);
     const stdY  = Math.sqrt(points.reduce((s,p) => s+Math.pow(p.y-meanY,2),0)/points.length);
 
-    // Colour: outliers red, selected cyan, normal accent
     const selectedName = this.state.selectedFeature?.properties?.lganame || '';
     const ptColor = (p) => {
       if (p.name === selectedName) return '#00d4ff';
-      const zx = Math.abs((p.x - meanX) / stdX);
-      const zy = Math.abs((p.y - meanY) / stdY);
-      if (zx > 1.5 || zy > 1.5) return '#ff4d6a';
-      return 'rgba(0,212,255,0.5)';
+      const zx = Math.abs((p.x - meanX) / (stdX || 1));
+      const zy = Math.abs((p.y - meanY) / (stdY || 1));
+      return (zx > 1.5 || zy > 1.5) ? '#ff4d6a' : 'rgba(0,212,255,0.5)';
     };
 
     const ctx = document.getElementById('gasCorrelationChart');
@@ -1622,7 +1781,7 @@ const app = {
       type: 'scatter',
       data: {
         datasets: [{
-          label: `CH₄ vs CO (${year})`,
+          label: `${xLabel} vs ${yLabel} (${year})`,
           data: points,
           backgroundColor: points.map(ptColor),
           pointRadius: 6,
@@ -1635,45 +1794,54 @@ const app = {
           legend: { display: false },
           tooltip: {
             callbacks: {
-              label: ctx => {
-                const p = ctx.raw;
-                return [`${p.name}`, `CH₄: ${p.x.toFixed(5)}`, `CO: ${p.y.toFixed(5)}`];
+              label: c => {
+                const p = c.raw;
+                return [`${p.name}`, `${xLabel}: ${p.x.toFixed(5)}`, `${yLabel}: ${p.y.toFixed(5)}`];
               }
             }
           }
         },
         scales: {
-          x: { title:{ display:true, text:'CH₄ (mol/m²)', color:'#7a8fa8', font:{size:10} },
+          x: { title:{ display:true, text:`${xLabel} (mol/m²)`, color:'#7a8fa8', font:{size:10} },
                ticks:{ color:'#7a8fa8', font:{size:9} }, grid:{ color:'rgba(255,255,255,0.04)' } },
-          y: { title:{ display:true, text:'CO (mol/m²)',  color:'#7a8fa8', font:{size:10} },
+          y: { title:{ display:true, text:`${yLabel} (mol/m²)`, color:'#7a8fa8', font:{size:10} },
                ticks:{ color:'#7a8fa8', font:{size:9} }, grid:{ color:'rgba(255,255,255,0.04)' } }
         },
         onClick: (e, els) => {
-          if (els.length) {
-            const p = points[els[0].index];
-            this.selectLGAByName(p.name);
-          }
+          if (els.length) this.selectLGAByName(points[els[0].index].name);
         }
       }
     });
 
-    // Table: sorted by distance from mean (outliers first)
+    // Update table header to match selected gases
+    const tHead = document.getElementById('correlationHead');
+    if (tHead) {
+      tHead.innerHTML = `<tr><th>LGA</th><th>${xLabel}</th><th>${yLabel}</th>${thirdLabel ? `<th>${thirdLabel}</th>` : ''}<th>ISI</th></tr>`;
+    }
+
+    // Table: sorted by distance from cluster mean (outliers first)
     const sorted = [...points].sort((a,b) => {
-      const da = Math.sqrt(Math.pow((a.x-meanX)/stdX,2)+Math.pow((a.y-meanY)/stdY,2));
-      const db = Math.sqrt(Math.pow((b.x-meanX)/stdX,2)+Math.pow((b.y-meanY)/stdY,2));
+      const da = Math.sqrt(Math.pow((a.x-meanX)/(stdX||1),2)+Math.pow((a.y-meanY)/(stdY||1),2));
+      const db = Math.sqrt(Math.pow((b.x-meanX)/(stdX||1),2)+Math.pow((b.y-meanY)/(stdY||1),2));
       return db - da;
     });
+
     const tbody = document.getElementById('correlationBody');
     if (tbody) {
       tbody.innerHTML = sorted.map(p => {
-        const isOut = Math.abs((p.x-meanX)/stdX)>1.5 || Math.abs((p.y-meanY)/stdY)>1.5;
+        const isOut = Math.abs((p.x-meanX)/(stdX||1))>1.5 || Math.abs((p.y-meanY)/(stdY||1))>1.5;
         const isSel = p.name === selectedName;
         const risk  = this.getEriClassification(p.isi);
+        const feat  = feats.find(f => f.properties.lganame === p.name);
+        const thirdVal = thirdKey && feat ? this.getMetricValue(feat, thirdKey, year) : null;
+        const thirdCell = thirdLabel
+          ? `<td style="color:${gasColors[thirdKey]};font-size:10px;font-weight:600">${thirdVal ? thirdVal.toFixed(5) : '-'}</td>`
+          : '';
         return `<tr onclick="app.selectLGAByName('${p.name}')" style="${isSel?'border-left:2px solid #00d4ff':''}">
           <td class="lga-name-cell" style="${isSel?'color:#00d4ff':isOut?'color:#ff4d6a':''}">${p.name}${isOut?' <span style="font-size:9px;color:#ff4d6a">anomaly</span>':''}</td>
-          <td style="color:#3b82f6;font-size:10px;font-weight:600">${p.x.toFixed(5)}</td>
-          <td style="color:#f59e0b;font-size:10px;font-weight:600">${p.y.toFixed(5)}</td>
-          <td style="color:#10b981;font-size:10px;font-weight:600">${p.no2.toFixed(5)}</td>
+          <td style="color:${gasColors[xKey]};font-size:10px;font-weight:600">${p.x.toFixed(5)}</td>
+          <td style="color:${gasColors[yKey]};font-size:10px;font-weight:600">${p.y.toFixed(5)}</td>
+          ${thirdCell}
           <td><span class="sa-badge ${risk.css}" style="font-size:8px">${risk.label}</span></td>
         </tr>`;
       }).join('');
@@ -1945,8 +2113,38 @@ const app = {
     }
     const year   = this.state.currentYear;
     const metric = this.state.currentMetric;
+    const metricName = { ch4:'CH₄', no2:'NO₂', co:'CO', isi:'ISI', hotspots:'Hotspots' }[metric] || metric.toUpperCase();
+
+    // Show "Rendering…" pill immediately so the user knows work is happening
+    document.getElementById('raster-loading-toast')?.remove();
+    const loadingToast = document.createElement('div');
+    loadingToast.id = 'raster-loading-toast';
+    loadingToast.style.cssText = [
+      'position:fixed', 'bottom:28px', 'left:50%', 'transform:translateX(-50%)',
+      'background:rgba(7,12,20,0.92)', 'border:1px solid rgba(0,212,255,0.35)',
+      'color:#00d4ff', 'padding:9px 18px', 'border-radius:99px',
+      'font-size:12px', 'font-weight:600', 'z-index:9999',
+      'display:flex', 'align-items:center', 'gap:8px',
+      'pointer-events:none', 'white-space:nowrap',
+    ].join(';');
+    loadingToast.innerHTML = `<span style="width:8px;height:8px;border-radius:50%;background:#00d4ff;animation:pulse 1.5s infinite;flex-shrink:0"></span>Rendering ${metricName} · ${year}…`;
+    document.body.appendChild(loadingToast);
+
+    // Safety: remove the toast after 60 s even if the load event never fires
+    const toastTimer = setTimeout(() => document.getElementById('raster-loading-toast')?.remove(), 60000);
+
+    const onRasterLoad = () => {
+      clearTimeout(toastTimer);
+      document.getElementById('raster-loading-toast')?.remove();
+      this.showNotification(`Raster loaded — ${metricName} · ${year}`, 'success');
+    };
+
     const georaster = await this.loadRaster(year);
-    if (!georaster) return;
+    if (!georaster) {
+      clearTimeout(toastTimer);
+      document.getElementById('raster-loading-toast')?.remove();
+      return;
+    }
 
     const bandIdx = this.BAND_INDEX[metric] ?? 0;
     const aoiMask = this.getAOIMask();
@@ -1963,8 +2161,6 @@ const app = {
     // Interpolate colour
     const getColor = (val) => {
       if (val === null || isNaN(val)) return null;
-      // CH4 convert ppb → mol/m² for display consistency
-      const v = metric === 'ch4' ? val * this.CH4_PPB_TO_MOL * 1e6 : val;
       const t = Math.max(0, Math.min(1, (val - scale.min) / (scale.max - scale.min)));
       const stops = scale.colors;
       const idx   = t * (stops.length - 1);
@@ -1972,10 +2168,7 @@ const app = {
       const f     = idx - lo;
       const hexToRgb = h => [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)];
       const c1 = hexToRgb(stops[lo]), c2 = hexToRgb(stops[hi] || stops[lo]);
-      const r = Math.round(c1[0] + (c2[0]-c1[0])*f);
-      const g = Math.round(c1[1] + (c2[1]-c1[1])*f);
-      const b = Math.round(c1[2] + (c2[2]-c1[2])*f);
-      return `rgba(${r},${g},${b},0.7)`;
+      return `rgba(${Math.round(c1[0]+(c2[0]-c1[0])*f)},${Math.round(c1[1]+(c2[1]-c1[1])*f)},${Math.round(c1[2]+(c2[2]-c1[2])*f)},0.7)`;
     };
 
     if (this.state.geeMode) {
@@ -1986,9 +2179,13 @@ const app = {
         attribution: 'Google Earth Engine · Sentinel-5P'
       });
       if (document.getElementById('rasterLayer')?.checked) {
+        this.layers.raster.once('load', onRasterLoad);
         this.layers.raster.addTo(this.map);
         if (this.layers.lgas)   this.layers.lgas.bringToFront();
         if (this.layers.points) this.layers.points.bringToFront();
+      } else {
+        clearTimeout(toastTimer);
+        document.getElementById('raster-loading-toast')?.remove();
       }
       this.setupGEEClickHandler();
     } else {
@@ -2010,9 +2207,13 @@ const app = {
       }
       this.layers.raster = new GeoRasterLayer(rasterOptions);
       if (document.getElementById('rasterLayer')?.checked) {
+        this.layers.raster.once('load', onRasterLoad);
         this.layers.raster.addTo(this.map);
         if (this.layers.lgas)   this.layers.lgas.bringToFront();
         if (this.layers.points) this.layers.points.bringToFront();
+      } else {
+        clearTimeout(toastTimer);
+        document.getElementById('raster-loading-toast')?.remove();
       }
       this.setupRasterClickHandler(georaster);
     }
@@ -2152,7 +2353,27 @@ const app = {
     if (badge) { badge.textContent = risk.label; badge.className = `stat-badge ${risk.css}`; }
 
     const trendEl = document.getElementById('stat-trend');
-    if (trendEl) trendEl.textContent = pt.hot > 0.5 ? '🔴 Hotspot' : '✅ Normal';
+    if (trendEl) {
+      if (pt.hot > 0.5) {
+        trendEl.textContent = '🔴 Hotspot';
+        trendEl.classList.remove('negative');
+      } else {
+        const lgaFeat = this.state.data.lgas?.features?.find(f => f.properties.lganame === pt.lgaName);
+        if (lgaFeat) {
+          const year    = String(this.state.currentYear);
+          const prevYear = String(parseInt(year) - 1);
+          const metric  = this.state.currentMetric;
+          const curVal  = this.getMetricValue(lgaFeat, metric, year)  || 0;
+          const prevVal = this.getMetricValue(lgaFeat, metric, prevYear) || 0;
+          const yoy = prevVal !== 0 ? ((curVal - prevVal) / prevVal * 100).toFixed(1) : '0.0';
+          trendEl.textContent = `${Number(yoy) > 0 ? '+' : ''}${yoy}%`;
+          trendEl.classList.toggle('negative', Number(yoy) < 0);
+        } else {
+          trendEl.textContent = '-';
+          trendEl.classList.remove('negative');
+        }
+      }
+    }
   },
 
   async updateChartsForPoint(lat, lng, currentGeoraster) {
@@ -2526,6 +2747,498 @@ const app = {
     win.document.close();
   },
 
+  // ── Drawing Tools ────────────────────────────────────────────
+
+  initDrawTools() {
+    this.state.drawnItems = L.featureGroup().addTo(this.map);
+
+    const markerIcon = L.divIcon({
+      className: '',
+      html: '<div style="width:12px;height:12px;border-radius:50%;background:#00d4ff;border:2px solid #070c14;box-shadow:0 0 8px rgba(0,212,255,0.7)"></div>',
+      iconSize: [12, 12], iconAnchor: [6, 6], popupAnchor: [0, -10],
+    });
+
+    this._drawHandlers = {
+      marker:   new L.Draw.Marker(this.map, { icon: markerIcon, repeatMode: false }),
+      polyline: new L.Draw.Polyline(this.map, {
+        shapeOptions: { color: '#00d4ff', weight: 2.5, dashArray: '5 4', opacity: 0.9 },
+        showLength: true, metric: true, repeatMode: false,
+      }),
+      polygon:  new L.Draw.Polygon(this.map, {
+        shapeOptions: { color: '#a855f7', weight: 2, fillColor: '#a855f7', fillOpacity: 0.12 },
+        showArea: true, metric: true, repeatMode: false,
+      }),
+    };
+
+    const appRef = this;
+    const DrawCtrl = L.Control.extend({
+      options: { position: 'topleft' },
+      onAdd: function() {
+        const div = L.DomUtil.create('div', 'draw-toolbar');
+        L.DomEvent.disableClickPropagation(div);
+        L.DomEvent.disableScrollPropagation(div);
+        div.innerHTML = `
+          <button class="draw-btn" id="draw-point-btn" title="Point — inspect pixel gas values">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/>
+            </svg>
+          </button>
+          <button class="draw-btn" id="draw-line-btn" title="Transect — emission profile along a line">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/>
+            </svg>
+          </button>
+          <button class="draw-btn" id="draw-poly-btn" title="Zone — zonal statistics for a drawn area">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="12,2 22,8.5 22,15.5 12,22 2,15.5 2,8.5"/>
+            </svg>
+          </button>
+          <div class="draw-sep"></div>
+          <button class="draw-btn" id="draw-clear-btn" title="Clear all drawings">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3,6 5,6 21,6"/><path d="M19,6l-1,14H6L5,6m3,0V4h8v2"/>
+            </svg>
+          </button>
+        `;
+        div.querySelector('#draw-point-btn').onclick = () => appRef.activateDrawTool('marker');
+        div.querySelector('#draw-line-btn').onclick  = () => appRef.activateDrawTool('polyline');
+        div.querySelector('#draw-poly-btn').onclick  = () => appRef.activateDrawTool('polygon');
+        div.querySelector('#draw-clear-btn').onclick = () => appRef.clearDrawings();
+        return div;
+      },
+    });
+    new DrawCtrl().addTo(this.map);
+
+    this.map.on(L.Draw.Event.CREATED, (e) => this.handleDrawCreated(e));
+  },
+
+  activateDrawTool(type) {
+    if (this.state.activeDraw) {
+      this._drawHandlers[this.state.activeDraw]?.disable();
+    }
+    if (this.state.activeDraw === type) {
+      this.state.activeDraw = null;
+      document.querySelectorAll('.draw-btn').forEach(b => b.classList.remove('active'));
+      return;
+    }
+    this.state.activeDraw = type;
+    document.querySelectorAll('.draw-btn').forEach(b => b.classList.remove('active'));
+    const btnMap = { marker:'draw-point-btn', polyline:'draw-line-btn', polygon:'draw-poly-btn' };
+    document.getElementById(btnMap[type])?.classList.add('active');
+    this._drawHandlers[type]?.enable();
+  },
+
+  handleDrawCreated(e) {
+    this.state.activeDraw = null;
+    document.querySelectorAll('.draw-btn').forEach(b => b.classList.remove('active'));
+    const { layer, layerType } = e;
+    this.state.drawnItems.addLayer(layer);
+    if      (layerType === 'marker')   this.analyzeDrawnPoint(layer.getLatLng(), layer);
+    else if (layerType === 'polyline') this.analyzeDrawnTransect(layer.getLatLngs(), layer);
+    else if (layerType === 'polygon')  this.analyzeDrawnZone(layer.getLatLngs()[0], layer);
+  },
+
+  // ── Point ────────────────────────────────────────────────────
+  async analyzeDrawnPoint(latlng, layer) {
+    const { lat, lng } = latlng;
+    const year = parseInt(this.state.currentYear);
+
+    this.showDrawResults('Point Analysis',
+      `<div class="draw-loading"><span class="draw-pulse"></span>Fetching pixel values…</div>`);
+
+    try {
+      let vals;
+      if (this.state.geeMode) {
+        const resp = await fetch(
+          `${this.state.GEE_SERVER}/pixel?lat=${lat}&lng=${lng}&year=${year}`,
+          { signal: AbortSignal.timeout(15000) }
+        );
+        vals = await resp.json();
+        if (vals.error) throw new Error(vals.error);
+      } else {
+        const gr = await this.loadRaster(String(year));
+        if (!gr) throw new Error('No local raster available');
+        const col = Math.floor((lng - gr.xmin) / gr.pixelWidth);
+        const row = Math.floor((gr.ymax - lat) / gr.pixelHeight);
+        if (row < 0 || row >= gr.height || col < 0 || col >= gr.width)
+          throw new Error('Point outside raster extent');
+        vals = {
+          ch4: (gr.values[0][row][col] || 0) * this.CH4_PPB_TO_MOL,
+          no2: Math.max(0, gr.values[1][row][col] || 0),
+          co:  gr.values[2][row][col] || 0,
+          isi: gr.values[3][row][col] || 0,
+          hot: gr.values[4]?.[row]?.[col] || 0,
+        };
+      }
+      const risk = this.getEriClassification(vals.isi);
+      layer.bindPopup(`
+        <div style="font-family:Inter,sans-serif;font-size:11px;min-width:145px">
+          <div style="font-weight:700;color:#00d4ff;margin-bottom:5px">Pixel · ${year}</div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:2px"><span>CH₄</span><b style="color:#3b82f6">${(vals.ch4||0).toFixed(5)}</b></div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:2px"><span>NO₂</span><b style="color:#10b981">${(vals.no2||0).toFixed(5)}</b></div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:2px"><span>CO</span><b style="color:#f59e0b">${(vals.co||0).toFixed(5)}</b></div>
+          <div style="display:flex;justify-content:space-between"><span>ISI</span><b style="color:#a855f7">${(vals.isi||0).toFixed(4)}</b></div>
+        </div>
+      `).openPopup();
+
+      this.showDrawResults('Point Analysis', `
+        <div class="draw-point-grid">
+          <div class="draw-stat-box ch4"><div class="draw-gas-sym">CH₄</div><div class="draw-gas-val">${(vals.ch4||0).toFixed(5)}</div><div class="draw-gas-unit">mol/m²</div></div>
+          <div class="draw-stat-box no2"><div class="draw-gas-sym">NO₂</div><div class="draw-gas-val">${(vals.no2||0).toFixed(5)}</div><div class="draw-gas-unit">mol/m²</div></div>
+          <div class="draw-stat-box co"><div class="draw-gas-sym">CO</div><div class="draw-gas-val">${(vals.co||0).toFixed(5)}</div><div class="draw-gas-unit">mol/m²</div></div>
+          <div class="draw-stat-box isi"><div class="draw-gas-sym">ISI</div><div class="draw-gas-val">${(vals.isi||0).toFixed(4)}</div><div class="draw-gas-unit">score</div></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+          <span style="font-size:9px;color:var(--t3)">${lat.toFixed(5)}°N, ${lng.toFixed(5)}°E</span>
+          <span class="sa-badge ${risk.css}" style="font-size:8px">${risk.label}</span>
+        </div>
+      `);
+    } catch(err) {
+      this.showDrawResults('Point Analysis',
+        `<div style="color:var(--red);font-size:11px;padding:6px 0">${err.message}</div>`);
+    }
+  },
+
+  // ── Transect ─────────────────────────────────────────────────
+  async analyzeDrawnTransect(latlngs, layer) {
+    const year    = parseInt(this.state.currentYear);
+    const metric  = this.state.currentMetric;
+    const mLabel  = { ch4:'CH₄', no2:'NO₂', co:'CO' }[metric] || metric.toUpperCase();
+    const mColor  = { ch4:'#3b82f6', no2:'#10b981', co:'#f59e0b' }[metric] || '#00d4ff';
+    const samples = this.samplePolyline(latlngs, 20);
+
+    this.showDrawResults('Emission Transect',
+      `<div class="draw-loading"><span class="draw-pulse"></span>Sampling ${samples.length} points along transect…</div>`,
+      true);
+
+    const results = [];
+    for (const s of samples) {
+      try {
+        let val = null;
+        if (this.state.geeMode) {
+          const resp = await fetch(
+            `${this.state.GEE_SERVER}/pixel?lat=${s.latlng.lat}&lng=${s.latlng.lng}&year=${year}`,
+            { signal: AbortSignal.timeout(12000) }
+          );
+          const data = await resp.json();
+          if (!data.error) val = data[metric] ?? null;
+        } else {
+          const gr = await this.loadRaster(String(year));
+          if (gr) {
+            const bi  = this.BAND_INDEX[metric] ?? 0;
+            const col = Math.floor((s.latlng.lng - gr.xmin) / gr.pixelWidth);
+            const row = Math.floor((gr.ymax - s.latlng.lat) / gr.pixelHeight);
+            if (row >= 0 && row < gr.height && col >= 0 && col < gr.width) {
+              const raw = gr.values[bi][row][col];
+              if (raw != null && !isNaN(raw) && raw > 0)
+                val = metric === 'ch4' ? raw * this.CH4_PPB_TO_MOL : Math.max(0, raw);
+            }
+          }
+        }
+        results.push({ distance: s.distance, value: val });
+      } catch(e) {
+        results.push({ distance: s.distance, value: null });
+      }
+    }
+
+    const totalDist = results[results.length - 1]?.distance || 0;
+    this.showDrawResults('Emission Transect', `
+      <div style="font-size:10px;color:var(--t2)">
+        ${mLabel} · ${year} · ${(totalDist/1000).toFixed(2)} km · ${samples.length} samples
+      </div>
+    `, true);
+
+    const wrap = document.getElementById('drawTransectWrap');
+    if (wrap) wrap.style.display = 'block';
+    const canvas = document.getElementById('drawTransectChart');
+    if (!canvas) return;
+
+    if (this.charts.transect) { this.charts.transect.destroy(); this.charts.transect = null; }
+    this.charts.transect = new Chart(canvas, {
+      type: 'line',
+      data: {
+        labels: results.map(r => (r.distance / 1000).toFixed(2)),
+        datasets: [{
+          label: `${mLabel} (mol/m²)`,
+          data:  results.map(r => r.value),
+          borderColor: mColor, backgroundColor: mColor + '18',
+          borderWidth: 2, pointRadius: 3, fill: true, tension: 0.3, spanGaps: true,
+        }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: {
+            title: c => `${c[0].label} km`,
+            label: c => `${mLabel}: ${c.raw != null ? c.raw.toFixed(5) : 'N/A'}`,
+          }},
+        },
+        scales: {
+          x: { title:{ display:true, text:'Distance (km)', color:'#7a8fa8', font:{size:9} },
+               ticks:{ color:'#7a8fa8', font:{size:8}, maxTicksLimit:6 }, grid:{ color:'rgba(255,255,255,0.04)' } },
+          y: { title:{ display:true, text:`${mLabel} (mol/m²)`, color:'#7a8fa8', font:{size:9} },
+               ticks:{ color:'#7a8fa8', font:{size:8} }, grid:{ color:'rgba(255,255,255,0.04)' } },
+        },
+      },
+    });
+  },
+
+  // ── Zone ─────────────────────────────────────────────────────
+  async analyzeDrawnZone(latlngs, layer) {
+    const year = parseInt(this.state.currentYear);
+
+    this.showDrawResults('Zone Analysis',
+      `<div class="draw-loading"><span class="draw-pulse" style="background:#a855f7"></span>Running zonal statistics…</div>`);
+
+    try {
+      const coords = latlngs.map(ll => [ll.lng, ll.lat]);
+      if (coords[0][0] !== coords[coords.length-1][0] || coords[0][1] !== coords[coords.length-1][1])
+        coords.push(coords[0]);
+
+      let stats, source = 'LGA data';
+
+      // Try GEE /zone-stats; fall back silently on any failure
+      if (this.state.geeMode) {
+        try {
+          const resp = await fetch(`${this.state.GEE_SERVER}/zone-stats`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ geometry: { type:'Polygon', coordinates:[coords] }, year }),
+            signal: AbortSignal.timeout(30000),
+          });
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          const data = await resp.json();
+          if (data.error) throw new Error(data.error);
+          stats = data;
+          source = 'GEE';
+        } catch(geeErr) {
+          console.warn('GEE zone-stats unavailable, using LGA data:', geeErr.message);
+        }
+      }
+
+      // Always-available fallback: compute from loaded LGA GeoJSON attributes
+      if (!stats) stats = this.computeLGAZoneStats(coords, year);
+
+      const gases = [
+        { key:'ch4', label:'CH₄', color:'#3b82f6' },
+        { key:'no2', label:'NO₂', color:'#10b981' },
+        { key:'co',  label:'CO',  color:'#f59e0b' },
+        { key:'isi', label:'ISI', color:'#a855f7' },
+      ];
+      const areaKm2 = window.turf ? (turf.area(turf.polygon([coords])) / 1e6).toFixed(2) : '—';
+      const lgaNames = stats._lgas || [];
+
+      const rows = gases.map(g => {
+        const s  = stats[g.key] || {};
+        const dp = g.key === 'isi' ? 4 : 5;
+        const f  = v => (v != null && !isNaN(v)) ? Number(v).toFixed(dp) : '—';
+        return `<tr>
+          <td><span style="color:${g.color};font-weight:700">${g.label}</span></td>
+          <td style="color:var(--t1);font-weight:600;text-align:right">${f(s.mean)}</td>
+          <td style="color:var(--t2);text-align:right">${f(s.min)}</td>
+          <td style="color:var(--t2);text-align:right">${f(s.max)}</td>
+          <td style="color:var(--t3);text-align:right">${f(s.std)}</td>
+        </tr>`;
+      }).join('');
+
+      const lgaNote = lgaNames.length
+        ? `<div style="font-size:9px;color:var(--t3);margin-top:6px">
+             ${lgaNames.length} LGA${lgaNames.length > 1 ? 's' : ''}: ${lgaNames.slice(0,4).join(', ')}${lgaNames.length > 4 ? '…' : ''}
+           </div>` : '';
+
+      this.showDrawResults('Zone Analysis', `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-size:10px;color:var(--t2)">~${areaKm2} km² · ${year}</span>
+          <span style="font-size:9px;color:var(--t3);font-weight:600;text-transform:uppercase;letter-spacing:.5px">${source}</span>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:10px">
+          <thead><tr style="border-bottom:1px solid var(--border)">
+            <th style="text-align:left;padding:3px 4px;font-size:9px;color:var(--t3);text-transform:uppercase">Gas</th>
+            <th style="text-align:right;padding:3px 4px;font-size:9px;color:var(--t3);text-transform:uppercase">Mean</th>
+            <th style="text-align:right;padding:3px 4px;font-size:9px;color:var(--t3);text-transform:uppercase">Min</th>
+            <th style="text-align:right;padding:3px 4px;font-size:9px;color:var(--t3);text-transform:uppercase">Max</th>
+            <th style="text-align:right;padding:3px 4px;font-size:9px;color:var(--t3);text-transform:uppercase">Std</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+        ${lgaNote}
+      `);
+    } catch(err) {
+      this.showDrawResults('Zone Analysis',
+        `<div style="color:var(--red);font-size:11px;padding:6px 0">${err.message}</div>`);
+    }
+  },
+
+  // Compute zone stats from LGA GeoJSON attributes — no raster required
+  computeLGAZoneStats(closedCoords, year) {
+    if (!this.state.data.lgas) throw new Error('LGA data not loaded');
+    if (!window.turf) throw new Error('Turf.js not available');
+
+    const poly    = turf.polygon([closedCoords]);
+    const yr      = String(year);
+    const collect = { ch4:[], no2:[], co:[], isi:[] };
+    const inside  = [];
+
+    this.state.data.lgas.features.forEach(f => {
+      const lgaName = f.properties?.lganame;
+      if (!lgaName) return;
+
+      // Use boundary polygon centroid; fall back to emissions feature geometry
+      const boundary = this.state.data.lgasBoundary?.features?.find(b => b.properties.lganame === lgaName);
+      const geom     = boundary?.geometry || f.geometry;
+      if (!geom) return;
+
+      let pt;
+      try {
+        pt = geom.type === 'Point'
+          ? turf.point(geom.coordinates)
+          : turf.centroid({ type:'Feature', geometry:geom });
+      } catch(e) { return; }
+
+      try { if (!turf.booleanPointInPolygon(pt, poly)) return; } catch(e) { return; }
+
+      inside.push(lgaName);
+      collect.ch4.push(this.getMetricValue(f, 'ch4', yr) || 0);
+      collect.no2.push(this.getMetricValue(f, 'no2', yr) || 0);
+      collect.co.push (this.getMetricValue(f, 'co',  yr) || 0);
+      collect.isi.push(f.properties[`isi_${yr}`]         || 0);
+    });
+
+    // If the polygon is smaller than any LGA, use the nearest LGA centroid
+    if (!inside.length) {
+      const center = turf.centroid(poly);
+      let best = null, bestDist = Infinity;
+      this.state.data.lgas.features.forEach(f => {
+        const boundary = this.state.data.lgasBoundary?.features?.find(
+          b => b.properties.lganame === f.properties?.lganame
+        );
+        const geom = boundary?.geometry || f.geometry;
+        if (!geom) return;
+        try {
+          const c = geom.type === 'Point'
+            ? turf.point(geom.coordinates)
+            : turf.centroid({ type:'Feature', geometry:geom });
+          const d = turf.distance(center, c);
+          if (d < bestDist) { bestDist = d; best = f; }
+        } catch(e) {}
+      });
+      if (best) {
+        inside.push(best.properties.lganame + ' (nearest)');
+        collect.ch4.push(this.getMetricValue(best, 'ch4', yr) || 0);
+        collect.no2.push(this.getMetricValue(best, 'no2', yr) || 0);
+        collect.co.push (this.getMetricValue(best, 'co',  yr) || 0);
+        collect.isi.push(best.properties[`isi_${yr}`]          || 0);
+      }
+    }
+
+    const calcStats = arr => {
+      const vals = arr.filter(v => v > 0);
+      if (!vals.length) return { mean:null, min:null, max:null, std:null };
+      const mean = vals.reduce((a,b) => a+b, 0) / vals.length;
+      return { mean, min:Math.min(...vals), max:Math.max(...vals),
+               std: Math.sqrt(vals.reduce((s,v) => s+(v-mean)**2, 0) / vals.length) };
+    };
+    return {
+      ch4: calcStats(collect.ch4), no2: calcStats(collect.no2),
+      co:  calcStats(collect.co),  isi: calcStats(collect.isi),
+      _lgas: inside,
+    };
+  },
+
+  async computeLocalZoneStats(latlngs, year) {
+    const gr = await this.loadRaster(year);
+    if (!gr) throw new Error('No local raster for this year');
+    if (!window.turf) throw new Error('Turf.js required for local zone stats');
+    const coords = latlngs.map(ll => [ll.lng, ll.lat]);
+    if (coords[0][0] !== coords[coords.length-1][0]) coords.push(coords[0]);
+    const poly = turf.polygon([coords]);
+    const bbox = turf.bbox(poly);
+    const step = 0.008;
+    const collect = { ch4:[], no2:[], co:[], isi:[] };
+    const bands   = { ch4:0, no2:1, co:2, isi:3 };
+    for (let lat = bbox[1]; lat <= bbox[3]; lat += step) {
+      for (let lng = bbox[0]; lng <= bbox[2]; lng += step) {
+        try { if (!turf.booleanPointInPolygon(turf.point([lng, lat]), poly)) continue; }
+        catch(e) { continue; }
+        const col = Math.floor((lng - gr.xmin) / gr.pixelWidth);
+        const row = Math.floor((gr.ymax - lat) / gr.pixelHeight);
+        if (row < 0 || row >= gr.height || col < 0 || col >= gr.width) continue;
+        for (const [key, band] of Object.entries(bands)) {
+          const raw = gr.values[band]?.[row]?.[col];
+          if (raw == null || isNaN(raw) || raw <= 0) continue;
+          collect[key].push(key === 'ch4' ? raw * this.CH4_PPB_TO_MOL : Math.max(0, raw));
+        }
+      }
+    }
+    const calcStats = arr => {
+      if (!arr.length) return { mean:null, min:null, max:null, std:null };
+      const mean = arr.reduce((a,b) => a+b, 0) / arr.length;
+      return { mean, min:Math.min(...arr), max:Math.max(...arr),
+               std: Math.sqrt(arr.reduce((s,v) => s+(v-mean)**2, 0) / arr.length) };
+    };
+    return { ch4:calcStats(collect.ch4), no2:calcStats(collect.no2), co:calcStats(collect.co), isi:calcStats(collect.isi) };
+  },
+
+  samplePolyline(latlngs, numSamples = 20) {
+    if (latlngs.length < 2) return [{ latlng: latlngs[0], distance: 0 }];
+    numSamples = Math.max(2, numSamples);
+
+    if (window.turf) {
+      const line    = turf.lineString(latlngs.map(ll => [ll.lng, ll.lat]));
+      const totalKm = turf.length(line, { units: 'kilometers' });
+      return Array.from({ length: numSamples }, (_, i) => {
+        const d  = (i / (numSamples - 1)) * totalKm;
+        const pt = turf.along(line, d, { units: 'kilometers' });
+        return { latlng: L.latLng(pt.geometry.coordinates[1], pt.geometry.coordinates[0]), distance: d * 1000 };
+      });
+    }
+
+    // Fallback: manual linear interpolation
+    const segs = [];
+    let total = 0;
+    for (let i = 0; i < latlngs.length - 1; i++) {
+      const d = latlngs[i].distanceTo(latlngs[i+1]);
+      segs.push({ len:d, from:latlngs[i], to:latlngs[i+1] });
+      total += d;
+    }
+    return Array.from({ length: numSamples }, (_, i) => {
+      const target = (i / (numSamples - 1)) * total;
+      let acc = 0, si = 0;
+      while (si < segs.length - 1 && acc + segs[si].len < target) acc += segs[si++].len;
+      const t = segs[si].len > 0 ? (target - acc) / segs[si].len : 0;
+      const { from, to } = segs[si];
+      return { latlng: L.latLng(from.lat + (to.lat - from.lat) * t, from.lng + (to.lng - from.lng) * t), distance: target };
+    });
+  },
+
+  showDrawResults(title, html, keepChart = false) {
+    const section      = document.getElementById('drawResultsSection');
+    const titleEl      = document.getElementById('drawResultsTitle');
+    const contentEl    = document.getElementById('drawResultsContent');
+    const transectWrap = document.getElementById('drawTransectWrap');
+    if (!section) return;
+    if (titleEl)   titleEl.textContent = title;
+    if (contentEl) contentEl.innerHTML = html;
+    if (!keepChart && transectWrap) {
+      transectWrap.style.display = 'none';
+      if (this.charts.transect) { this.charts.transect.destroy(); this.charts.transect = null; }
+    }
+    section.style.display = 'block';
+  },
+
+  clearDrawings() {
+    this.state.drawnItems?.clearLayers();
+    if (this.state.activeDraw) {
+      this._drawHandlers?.[this.state.activeDraw]?.disable();
+      this.state.activeDraw = null;
+    }
+    document.querySelectorAll('.draw-btn').forEach(b => b.classList.remove('active'));
+    const section = document.getElementById('drawResultsSection');
+    if (section) section.style.display = 'none';
+    if (this.charts.transect) { this.charts.transect.destroy(); this.charts.transect = null; }
+  },
+
   // Search for location
   searchLocation() {
     const searchInput = document.getElementById('locationSearch');
@@ -2579,25 +3292,31 @@ const app = {
     }
   },
 
-  // Show notification
-  showNotification(message) {
+  // Show notification  (type: 'error' | 'success' | 'info')
+  showNotification(message, type = 'error') {
+    const styles = {
+      error:   { bg: '#ef4444',  color: '#ffffff' },
+      success: { bg: '#00e5a0',  color: '#070c14' },
+      info:    { bg: '#00d4ff',  color: '#070c14' },
+    };
+    const s = styles[type] || styles.error;
     const notification = document.createElement('div');
     notification.style.cssText = `
       position: fixed;
       top: 20px;
       right: 20px;
-      background: #ef4444;
-      color: white;
-      padding: 16px 20px;
+      background: ${s.bg};
+      color: ${s.color};
+      padding: 12px 18px;
       border-radius: 8px;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
       z-index: 10000;
-      font-size: 14px;
+      font-size: 13px;
+      font-weight: 600;
     `;
     notification.textContent = message;
     document.body.appendChild(notification);
-
-    setTimeout(() => notification.remove(), 4000);
+    setTimeout(() => notification.remove(), type === 'error' ? 4000 : 3000);
   },
 };
 

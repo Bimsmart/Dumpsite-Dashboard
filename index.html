@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
   <link rel="stylesheet" href="style.css">
 </head>
@@ -127,6 +128,18 @@
           <button id="searchButton" class="search-btn">Go</button>
         </div>
       </div>
+      <!-- Theme Switcher -->
+      <div class="theme-switcher" title="Switch theme">
+        <button class="theme-btn active" data-theme="dark" title="Dark">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+        <button class="theme-btn" data-theme="light" title="Light">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        </button>
+        <button class="theme-btn" data-theme="modern" title="Modern">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>
+        </button>
+      </div>
       <div class="topbar-kpis">
         <div class="strip-card">
           <div class="strip-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#00d4ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3,11 12,2 21,11"/><polyline points="3,16 12,7 21,16"/><polyline points="3,21 12,12 21,21"/></svg></div>
@@ -187,6 +200,15 @@
       <!-- RIGHT PANEL -->
       <aside class="right-panel">
         <div class="rp-header">LGA Inspector</div>
+
+        <!-- Draw analysis results — visible when a shape has been analyzed -->
+        <div class="rp-section" id="drawResultsSection" style="display:none">
+          <div class="rp-section-title" id="drawResultsTitle">Analysis</div>
+          <div id="drawResultsContent"></div>
+          <div id="drawTransectWrap" style="display:none;height:150px;position:relative;margin-top:8px;border:1px solid var(--border);border-radius:var(--r-md);padding:8px;background:var(--surface-2)">
+            <canvas id="drawTransectChart"></canvas>
+          </div>
+        </div>
 
         <div class="rp-section">
           <div class="rp-section-title">Selected LGA</div>
@@ -456,14 +478,32 @@
       <!-- Gas Correlation -->
       <div class="gas-content" id="gas-correlation">
         <div class="sa-desc">
-          Scatter plot of <strong>CH&#8324; vs CO</strong> per LGA for the selected year. LGAs far from the cluster may indicate unusual gas profiles — potential anomaly indicators.
+          Scatter plot of two selected gases per LGA for the selected year. LGAs far from the cluster may indicate unusual gas profiles — potential anomaly indicators.
+        </div>
+        <div class="sa-controls-row" style="margin-bottom:8px">
+          <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0">
+            <label style="font-size:10px;color:var(--t2);font-weight:600;white-space:nowrap">X Axis</label>
+            <select id="gas-corr-x" class="sa-select">
+              <option value="ch4" selected>CH&#8324; Methane</option>
+              <option value="no2">NO&#8322; Nitrogen Dioxide</option>
+              <option value="co">CO Carbon Monoxide</option>
+            </select>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0">
+            <label style="font-size:10px;color:var(--t2);font-weight:600;white-space:nowrap">Y Axis</label>
+            <select id="gas-corr-y" class="sa-select">
+              <option value="ch4">CH&#8324; Methane</option>
+              <option value="no2">NO&#8322; Nitrogen Dioxide</option>
+              <option value="co" selected>CO Carbon Monoxide</option>
+            </select>
+          </div>
         </div>
         <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-md);padding:10px;height:260px;position:relative;flex-shrink:0">
           <canvas id="gasCorrelationChart"></canvas>
         </div>
         <div class="sa-table-wrap">
           <table class="sa-table" id="correlationTable">
-            <thead><tr><th>LGA</th><th>CH&#8324;</th><th>CO</th><th>NO&#8322;</th><th>ISI</th></tr></thead>
+            <thead id="correlationHead"><tr><th>LGA</th><th>CH&#8324;</th><th>CO</th><th>NO&#8322;</th><th>ISI</th></tr></thead>
             <tbody id="correlationBody"></tbody>
           </table>
         </div>
@@ -785,6 +825,7 @@
 <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
 <script src="https://unpkg.com/georaster@1.6.0/dist/georaster.browser.bundle.min.js"></script>
 <script src="https://unpkg.com/georaster-layer-for-leaflet@2.0.0/dist/georaster-layer-for-leaflet.min.js"></script>
 <script src="app.js"></script>
