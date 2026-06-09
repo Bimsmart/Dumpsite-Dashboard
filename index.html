@@ -45,6 +45,7 @@
         <option value="2023">2023</option>
         <option value="2024">2024</option>
         <option value="2025" selected>2025</option>
+        <option value="2026" style="color:#f97316">2026 (in progress)</option>
       </select>
 
       <div class="ctrl-label">METRIC</div>
@@ -66,7 +67,7 @@
         <label class="layer-toggle">
           <input type="checkbox" id="lgaBoundaries" checked>
           <span class="toggle-track"></span>
-          <span class="toggle-label">LGA Boundaries</span>
+          <span class="toggle-label">LGA Emissions</span>
         </label>
         <label class="layer-toggle">
           <input type="checkbox" id="landfillsPoints" checked>
@@ -90,17 +91,12 @@
         <label class="layer-toggle">
           <input type="checkbox" id="geeLGALayer">
           <span class="toggle-track"></span>
-          <span class="toggle-label">GEE LGA Boundaries</span>
+          <span class="toggle-label">GEE LGA</span>
         </label>
         <label class="layer-toggle">
           <input type="checkbox" id="geeLagosLayer">
           <span class="toggle-track"></span>
           <span class="toggle-label">Lagos State Boundary</span>
-        </label>
-        <label class="layer-toggle">
-          <input type="checkbox" id="geeHotspotsLayer">
-          <span class="toggle-track"></span>
-          <span class="toggle-label">Hotspots Overlay</span>
         </label>
       </div>
 
@@ -204,6 +200,9 @@
         <!-- Draw analysis results — visible when a shape has been analyzed -->
         <div class="rp-section" id="drawResultsSection" style="display:none">
           <div class="rp-section-title" id="drawResultsTitle">Analysis</div>
+          <div class="rp-action-row" style="margin-top:10px">
+            <button id="generateReportButton" class="report-btn">Generate Report</button>
+          </div>
           <div id="drawResultsContent"></div>
           <div id="drawTransectWrap" style="display:none;height:150px;position:relative;margin-top:8px;border:1px solid var(--border);border-radius:var(--r-md);padding:8px;background:var(--surface-2)">
             <canvas id="drawTransectChart"></canvas>
@@ -277,7 +276,7 @@
       <div class="charts-row">
         <div class="chart-card">
           <div class="chart-hdr">
-            <span>Emission Trend (2018–present)</span>
+            <span id="trend-chart-title">Emission Trend (2018–present)</span>
             <button class="dl-btn" data-chart="trendChart">&#8681;</button>
           </div>
           <canvas id="trendChart"></canvas>
@@ -831,3 +830,4 @@
 <script src="app.js"></script>
 </body>
 </html>
+Add 

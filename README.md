@@ -2,6 +2,8 @@
 
 This project builds an interactive dashboard for Lagos State gas emissions using the current dataset.
 
+For a full executive-level overview, see `EXECUTIVE_DOCUMENTATION.md`.
+
 ## What is included
 
 - `prepare_dashboard_data.py`: Python script that joins LGA boundaries with yearly gas emission CSVs and exports GeoJSON files.

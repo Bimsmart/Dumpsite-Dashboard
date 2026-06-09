@@ -153,6 +153,9 @@ html, body { height:100%; font-family:'Inter',sans-serif; background:var(--bg); 
 .search-btn { background:var(--accent-d); border:1px solid rgba(0,212,255,.22); border-radius:var(--r-sm); color:var(--accent); font-size:11px; font-weight:600; padding:3px 10px; cursor:pointer; transition:all .2s; }
 .search-btn:hover { background:var(--accent); color:var(--bg); }
 
+.report-btn { background:var(--accent); border:1px solid rgba(0,212,255,.22); border-radius:var(--r-sm); color:var(--bg); font-size:11px; font-weight:600; padding:10px 12px; cursor:pointer; transition:all .2s; width:100%; }
+.report-btn:hover { background:var(--green); color:var(--bg); }
+
 .topbar-kpis { display:flex; align-items:stretch; border-left:1px solid var(--border); height:100%; flex:0 0 auto; }
 .strip-card { display:flex; align-items:center; gap:10px; padding:0 14px; border-right:1px solid var(--border); cursor:default; transition:background .2s; position:relative; height:100%; }
 .strip-card:last-child { border-right:none; }
@@ -173,11 +176,23 @@ html, body { height:100%; font-family:'Inter',sans-serif; background:var(--bg); 
 
 .map-legend { position:absolute; bottom:16px; left:16px; background:var(--map-legend-bg); backdrop-filter:blur(12px); border:1px solid rgba(0,212,255,.14); border-radius:var(--r-lg); padding:14px; z-index:1000; max-width:240px; box-shadow:var(--sh-lg); }
 .map-legend strong { display:block; font-family:'Space Grotesk',sans-serif; font-size:11px; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:.7px; margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid var(--border); }
-#legendContent { display:flex; flex-direction:column; gap:6px; }
+#legendContent { display:flex; flex-direction:column; gap:10px; }
+.legend-section { display:flex; flex-direction:column; gap:8px; }
+.legend-section-title { font-size:10px; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:0.8px; }
 .legend-item { display:grid; grid-template-columns:18px 1fr; gap:8px; align-items:center; padding:3px 0; }
 .legend-color { width:18px; height:18px; border-radius:4px; border:1px solid rgba(255,255,255,.08); }
+.legend-gradient { width:100%; height:12px; border-radius:999px; border:1px solid rgba(255,255,255,.08); }
+.legend-gradient-labels { display:flex; justify-content:space-between; gap:12px; margin-top:6px; font-size:9px; color:var(--t2); }
 .legend-label { font-size:10px; font-weight:700; color:var(--t1); text-transform:uppercase; }
 .legend-range,.legend-desc { font-size:9px; color:var(--t2); }
+
+.draw-results-table { width:100%; border-collapse:collapse; background:var(--surface-2); border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+.draw-results-table th, .draw-results-table td { padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.06); color:var(--t1); }
+.draw-results-table th { background:rgba(255,255,255,0.03); color:var(--t3); font-size:9px; text-transform:uppercase; letter-spacing:.4px; }
+.draw-results-table tbody tr { background: rgba(255,255,255,0.04); }
+.draw-results-table tbody tr:last-child td { border-bottom:none; }
+.draw-results-table td { background:transparent; }
+.draw-results-table tr { background:transparent; }
 
 .map-tip { position:absolute; bottom:16px; left:50%; transform:translateX(-50%); background:rgba(7,12,20,.82); border:1px solid var(--border); border-radius:20px; padding:5px 14px; font-size:10px; color:var(--t2); pointer-events:none; z-index:999; }
 
@@ -983,6 +998,20 @@ html, body { height:100%; font-family:'Inter',sans-serif; background:var(--bg); 
   text-align: center;
 }
 .lga-label::before { display: none !important; }
+
+/* GEE LGA overlay labels — slightly larger, cyan-tinted for raster context */
+.gee-lga-label {
+  font-size: 8px !important;
+  font-weight: 800 !important;
+  color: #e0f8ff !important;
+  letter-spacing: 0.3px;
+  text-shadow:
+    -1px -1px 3px rgba(0,0,0,1),
+     1px -1px 3px rgba(0,0,0,1),
+    -1px  1px 3px rgba(0,0,0,1),
+     1px  1px 3px rgba(0,0,0,1),
+     0    0   6px rgba(0,0,0,0.8) !important;
+}
 
 
 
