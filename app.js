@@ -63,6 +63,10 @@ const app = {
     geeHotspots: null,
   },
 
+  // Cache of pre-rendered imageOverlay objects keyed by "year_metric[_clipLGA]".
+  // Each combination is rendered only once; subsequent calls reuse the cached overlay.
+  _overlayCache: {},
+
   // Color scales for different metrics
   colorScales: {
     ch4: ['#16a34a', '#d9f99d', '#facc15', '#f97316', '#dc2626', '#7c2d12'],
@@ -2310,6 +2314,23 @@ const app = {
   },
 
   async applyRasterClip(lgaName) {
+    // Evict cached overlays rendered under the old clip so they are re-rendered
+    // with the new AOI on next load.  Cache keys: "year_metric" (no clip) or
+    // "year_metric_LGAName" (clipped).  Since metric names never contain '_',
+    // unclipped keys have exactly one '_'; clipped keys end with '_<LGA>'.
+    const oldClip = this.state.rasterClipLGA;
+    if (oldClip !== (lgaName || null)) {
+      if (oldClip) {
+        Object.keys(this._overlayCache).forEach(k => {
+          if (k.endsWith('_' + oldClip)) delete this._overlayCache[k];
+        });
+      } else {
+        // Switching from unclipped to clipped — evict unclipped entries
+        Object.keys(this._overlayCache).forEach(k => {
+          if (!k.slice(k.indexOf('_') + 1).includes('_')) delete this._overlayCache[k];
+        });
+      }
+    }
     this.state.rasterClipLGA = lgaName || null;
     this._updateClipButton();
     if (document.getElementById('rasterLayer')?.checked) {
@@ -2599,8 +2620,13 @@ const app = {
     } else {
       // ── Local GeoTIFF — render once to a static image overlay ──
       // Image overlays scale with the map without re-rendering on zoom,
-      // pan, or basemap/theme changes.
-      this.layers.raster = this.renderRasterToImageOverlay(georaster, metric, aoiMask);
+      // pan, or basemap/theme changes. Results are cached by year+metric+clip
+      // so repeated calls (metric switch, year change) skip re-rendering.
+      const cacheKey = `${year}_${metric}${this.state.rasterClipLGA ? '_' + this.state.rasterClipLGA : ''}`;
+      if (!this._overlayCache[cacheKey]) {
+        this._overlayCache[cacheKey] = this.renderRasterToImageOverlay(georaster, metric, aoiMask);
+      }
+      this.layers.raster = this._overlayCache[cacheKey];
       if (document.getElementById('rasterLayer')?.checked) {
         this.layers.raster.addTo(this.map);
         if (this.state.rasterClipLGA) this._addClipMask(this.state.rasterClipLGA);
@@ -2622,8 +2648,37 @@ const app = {
       if (!this.state.rasterData[y]) {
         // Stagger by 600 ms each to avoid hammering the network and blocking parsing
         setTimeout(() => {
-          if (!this.state.rasterData[y]) this.loadRaster(y);
+          if (!this.state.rasterData[y]) {
+            this.loadRaster(y).then(() => this._prewarmOverlayCache(y));
+          }
         }, i * 600);
+      } else {
+        // Already loaded — pre-warm cache in the background with low priority
+        const delay = (i + 1) * 400;
+        setTimeout(() => this._prewarmOverlayCache(y), delay);
+      }
+    });
+  },
+
+  // Pre-render all metrics for a given year into the overlay cache so that
+  // the user experiences instant switching between metrics and years.
+  _prewarmOverlayCache(year) {
+    const metrics = Object.keys(this.BAND_INDEX).filter(m => m !== 'hotspots');
+    const georaster = this.state.rasterData[year];
+    if (!georaster) return;
+    const clip = this.state.rasterClipLGA || null;
+    const aoiMask = this.getAOIMask();
+    const schedule = typeof requestIdleCallback === 'function'
+      ? (fn) => requestIdleCallback(fn, { timeout: 5000 })
+      : (fn) => setTimeout(fn, 0);
+    metrics.forEach(metric => {
+      const cacheKey = `${year}_${metric}${clip ? '_' + clip : ''}`;
+      if (!this._overlayCache[cacheKey]) {
+        schedule(() => {
+          if (!this._overlayCache[cacheKey]) {
+            this._overlayCache[cacheKey] = this.renderRasterToImageOverlay(georaster, metric, aoiMask);
+          }
+        });
       }
     });
   },
