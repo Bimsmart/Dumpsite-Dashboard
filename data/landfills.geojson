@@ -3,6 +3,13 @@
   "features": [
     {
       "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.2517626000000632,
+          6.571504200000049
+        ]
+      },
       "properties": {
         "Name": "Soluos I",
         "FolderPath": "landfills_.kmz/landfills",
@@ -13,18 +20,18 @@
         "PopupInfo": "<!DOCTYPE html><html><head></head><body><script type=\"text/javascript\">window.location.href=\"https://www.google.com/earth/rpc/entity?lat=6.57164885&lng=3.25150785&fid=0x103b9aac4636b27d:0xf4a96315d2c9fbd5&hl=en&gl=us&client=earth-client&cv=7.3.7.1155&use",
         "HasLabel": -1,
         "LabelID": 0,
-        "Status": ""
-      },
-      "geometry": {
-        "type": "Point",
-        "coordinates": [
-          3.2517626000000632,
-          6.571504200000049
-        ]
+        "Status": "Scheduled for decomissioning"
       }
     },
     {
       "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.253811800000051,
+          6.570989000000054
+        ]
+      },
       "properties": {
         "Name": "Soluos II",
         "FolderPath": "landfills_.kmz/landfills",
@@ -36,17 +43,17 @@
         "HasLabel": -1,
         "LabelID": 0,
         "Status": "Scheduled for decomissioning"
-      },
-      "geometry": {
-        "type": "Point",
-        "coordinates": [
-          3.253811800000051,
-          6.570989000000054
-        ]
       }
     },
     {
       "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.2533291820000727,
+          6.564522411000041
+        ]
+      },
       "properties": {
         "Name": "Soluos III",
         "FolderPath": "landfills_.kmz/landfills",
@@ -57,18 +64,18 @@
         "PopupInfo": "",
         "HasLabel": -1,
         "LabelID": 0,
-        "Status": "Being decomissioned"
-      },
-      "geometry": {
-        "type": "Point",
-        "coordinates": [
-          3.2533291820000727,
-          6.564522411000041
-        ]
+        "Status": "Scheduled for decomissioning"
       }
     },
     {
       "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3178029000000606,
+          6.530444300000056
+        ]
+      },
       "properties": {
         "Name": "Isolo",
         "FolderPath": "landfills_.kmz/landfills",
@@ -80,17 +87,17 @@
         "HasLabel": -1,
         "LabelID": 0,
         "Status": "Involved in environmental studies and investigations for rehabilitation."
-      },
-      "geometry": {
-        "type": "Point",
-        "coordinates": [
-          3.3178029000000606,
-          6.530444300000056
-        ]
       }
     },
     {
       "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.3773153000000207,
+          6.594333000000063
+        ]
+      },
       "properties": {
         "Name": "Olusosun",
         "FolderPath": "landfills_.kmz/landfills",
@@ -102,17 +109,17 @@
         "HasLabel": -1,
         "LabelID": 0,
         "Status": "Scheduled for decomissioning"
-      },
-      "geometry": {
-        "type": "Point",
-        "coordinates": [
-          3.3773153000000207,
-          6.594333000000063
-        ]
       }
     },
     {
       "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.302178708000042,
+          6.639721759000054
+        ]
+      },
       "properties": {
         "Name": "Abule egba",
         "FolderPath": "landfills_.kmz/landfills",
@@ -124,17 +131,17 @@
         "HasLabel": -1,
         "LabelID": 0,
         "Status": "Closed/ Dormant"
-      },
-      "geometry": {
-        "type": "Point",
-        "coordinates": [
-          3.302178708000042,
-          6.639721759000054
-        ]
       }
     },
     {
       "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.5805890530000397,
+          6.59878788900005
+        ]
+      },
       "properties": {
         "Name": "Ewu-Elepe",
         "FolderPath": "Ewu-Elepe .kmz",
@@ -146,13 +153,6 @@
         "HasLabel": -1,
         "LabelID": 0,
         "Status": "Active"
-      },
-      "geometry": {
-        "type": "Point",
-        "coordinates": [
-          3.5805890530000397,
-          6.59878788900005
-        ]
       }
     }
   ]

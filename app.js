@@ -22,6 +22,7 @@ const app = {
     selectedLayer: null,
     rasterData: {},
     clickedPoint: null,
+    rasterClipLGA: null,  // LGA name when raster is clipped to an LGA, null = full state
     geeMode: false,  // true when server.py is running
     GEE_SERVER: 'http://localhost:5001',
     geeRasterSource: 'asset',
@@ -52,6 +53,7 @@ const app = {
     buffers: null,
     buildings: null,
     raster: null,
+    clipMask: null,
     geeBoundary: null,
     geeLGA: null,
     geeLGALabels: null,
@@ -262,6 +264,13 @@ const app = {
     this.initDrawTools();
     this.updateDashboard();
     await this.initGEEMode();
+    // Lagos State Boundary is always active
+    await this.toggleGEELagosLayer(true);
+    // Default to raster view — remove LGA layer and load raster
+    if (this.map.hasLayer(this.layers.lgas)) this.map.removeLayer(this.layers.lgas);
+    await this.addRasterLayer();
+    const legendSub = document.getElementById('legendSub');
+    if (legendSub) legendSub.textContent = 'Pixel-level · Sentinel-5P';
   },
 
   // Load GeoJSON data
@@ -496,22 +505,39 @@ const app = {
     this.updateLegend();
   },
 
+  // Location-pin divIcon for landfill markers
+  _lfPinIcon(highlighted) {
+    const fill   = highlighted ? '#ffffff' : '#00d4ff';
+    const stroke = highlighted ? '#00d4ff' : '#0891b2';
+    const w = highlighted ? 32 : 26;
+    const h = highlighted ? 45 : 37;
+    return L.divIcon({
+      className: '',
+      html: `<svg width="${w}" height="${h}" viewBox="0 0 26 37" xmlns="http://www.w3.org/2000/svg" style="filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5))">
+        <path d="M13 0C5.82 0 0 5.82 0 13c0 9.75 13 24 13 24S26 22.75 26 13C26 5.82 20.18 0 13 0z" fill="${fill}" stroke="${stroke}" stroke-width="2"/>
+        <circle cx="13" cy="13" r="5" fill="white" opacity="0.9"/>
+      </svg>`,
+      iconSize:    [w, h],
+      iconAnchor:  [w / 2, h],
+      popupAnchor: [0, -h],
+    });
+  },
+
   // Add emission points layer (Landfills)
   addEmissionPointsLayer() {
     if (this.layers.points) {
       this.map.removeLayer(this.layers.points);
     }
+    this._lfMarkers = {};
 
     this.layers.points = L.geoJSON(this.state.data.emissionPoints, {
-      style: {
-        fillColor: '#ef4444',
-        weight: 2,
-        opacity: 1,
-        color: '#991b1b',
-        fillOpacity: 0.6,
+      pointToLayer: (feature, latlng) => {
+        return L.marker(latlng, { icon: this._lfPinIcon(false) });
       },
       onEachFeature: (feature, layer) => {
         const name = feature.properties.Name || 'Unknown Landfill';
+        this._lfMarkers[name] = layer;
+
         const popup = L.popup().setContent(`
           <div class="popup-content">
             <strong>${name}</strong><br/>
@@ -520,26 +546,35 @@ const app = {
         `);
 
         layer.bindPopup(popup);
-        layer.on('mouseover', () => {
-          layer.setStyle({
-            weight: 3,
-            fillOpacity: 0.8,
-          });
-          popup.openOn(this.map);
-        });
-        layer.on('mouseout', () => {
-          layer.setStyle({
-            weight: 2,
-            fillOpacity: 0.6,
-          });
-          this.map.closePopup(popup);
-        });
+        layer.on('mouseover', () => { popup.openOn(this.map); });
+        layer.on('mouseout',  () => { this.map.closePopup(popup); });
+        layer.on('click',     () => { this.highlightLandfill(name); });
       },
     });
-    
+
     if (document.getElementById('landfillsPoints').checked) {
       this.layers.points.addTo(this.map);
     }
+  },
+
+  highlightLandfill(name) {
+    // Reset all markers to default pin
+    Object.values(this._lfMarkers || {}).forEach(m => {
+      m._lfSelected = false;
+      m.setIcon(this._lfPinIcon(false));
+    });
+    // Highlight selected marker with cyan pin
+    const marker = (this._lfMarkers || {})[name];
+    if (marker) {
+      marker._lfSelected = true;
+      marker.setIcon(this._lfPinIcon(true));
+      const ll = marker.getLatLng();
+      this.map.flyTo(ll, Math.max(this.map.getZoom(), 14), { duration: 0.8 });
+    }
+    // Sync active state in the landfills panel cards
+    document.querySelectorAll('.lf-card').forEach(card => {
+      card.classList.toggle('lf-card--active', card.dataset.lfname === name);
+    });
   },
 
   // Add Hotspot layer
@@ -552,7 +587,7 @@ const app = {
     
     this.layers.hotspots = L.geoJSON(this.state.data.emissionPoints, {
       filter: (feature) => {
-        return feature.properties.year === year && feature.properties.hotspots > 0;
+        return String(feature.properties.year) === String(year) && feature.properties.hotspots > 0;
       },
       pointToLayer: (feature, latlng) => {
         return L.circleMarker(latlng, {
@@ -570,9 +605,7 @@ const app = {
       }
     });
 
-    if (document.getElementById('hotspotLayer')?.checked) {
-      this.layers.hotspots.addTo(this.map);
-    }
+    this.layers.hotspots.addTo(this.map);
   },
 
   // Add Heatmap layer
@@ -1128,6 +1161,7 @@ const app = {
     this.addLGALayer();
     this.addLandfillsLayer();
     this.addEmissionPointsLayer();
+    this.addHotspotLayer();
     this.updateCharts();
     this.updateKPIs();
     this.updateAnalyticsPanel();
@@ -1167,6 +1201,39 @@ const app = {
 
     document.getElementById('basemapSelect').addEventListener('change', (e) => {
       this.addBasemap(e.target.value);
+    });
+
+    document.getElementById('viewFormat')?.addEventListener('change', async (e) => {
+      const lgaChk    = document.getElementById('lgaBoundaries');
+      const rasterChk = document.getElementById('rasterLayer');
+      // Swap description text
+      document.getElementById('formatDesc-vector')?.classList.toggle('active', e.target.value === 'vector');
+      document.getElementById('formatDesc-raster')?.classList.toggle('active', e.target.value === 'raster');
+      // Reset raster clip when switching to vector
+      if (e.target.value === 'vector') {
+        this.state.rasterClipLGA = null;
+        this._updateClipButton();
+        this._removeClipMask();
+      }
+      if (e.target.value === 'raster') {
+        if (lgaChk?.checked) {
+          lgaChk.checked = false;
+          lgaChk.dispatchEvent(new Event('change'));
+        }
+        if (rasterChk && !rasterChk.checked) {
+          rasterChk.checked = true;
+          rasterChk.dispatchEvent(new Event('change'));
+        }
+      } else {
+        if (rasterChk?.checked) {
+          rasterChk.checked = false;
+          rasterChk.dispatchEvent(new Event('change'));
+        }
+        if (lgaChk && !lgaChk.checked) {
+          lgaChk.checked = true;
+          lgaChk.dispatchEvent(new Event('change'));
+        }
+      }
     });
 
     document.querySelectorAll('.theme-btn').forEach(btn => {
@@ -1215,12 +1282,7 @@ const app = {
         await this.addRasterLayer();
         const legendSub = document.getElementById('legendSub');
         if (legendSub) legendSub.textContent = 'Pixel-level · Sentinel-5P';
-        // Auto-enable Lagos State Boundary and GEE LGA (with labels)
-        const lagosChk = document.getElementById('geeLagosLayer');
-        if (lagosChk && !lagosChk.checked) {
-          lagosChk.checked = true;
-          await this.toggleGEELagosLayer(true);
-        }
+        // Auto-enable LGA Boundary overlay when switching to raster
         const geeLGAChk = document.getElementById('geeLGALayer');
         if (geeLGAChk && !geeLGAChk.checked) {
           geeLGAChk.checked = true;
@@ -1229,6 +1291,7 @@ const app = {
       } else if (this.layers.raster) {
         this.map.removeLayer(this.layers.raster);
         this.layers.raster = null;
+        this._removeClipMask();
         if (this._rasterClickHandler) this.map.off('click', this._rasterClickHandler);
         if (this._geeClickHandler)    this.map.off('click', this._geeClickHandler);
         // Restore LGA Emissions layer when Emission Surface is turned off
@@ -1236,17 +1299,6 @@ const app = {
         if (lgaChk && !lgaChk.checked) {
           lgaChk.checked = true;
           if (!this.map.hasLayer(this.layers.lgas)) this.map.addLayer(this.layers.lgas);
-        }
-        // Turn off Lagos Boundary and GEE LGA that were auto-enabled
-        const lagosChk = document.getElementById('geeLagosLayer');
-        if (lagosChk?.checked) {
-          lagosChk.checked = false;
-          await this.toggleGEELagosLayer(false);
-        }
-        const geeLGAChk = document.getElementById('geeLGALayer');
-        if (geeLGAChk?.checked) {
-          geeLGAChk.checked = false;
-          await this.toggleGEELGALayer(false);
         }
         const legendSub = document.getElementById('legendSub');
         if (legendSub) legendSub.textContent = 'LGA-level · Sentinel-5P';
@@ -1273,7 +1325,7 @@ const app = {
       }
     });
 
-    document.getElementById('lgaSelect').addEventListener('change', (e) => {
+    document.getElementById('lgaSelect').addEventListener('change', async (e) => {
       if (e.target.value) {
         const feature = this.state.data.lgas.features.find(f => f.properties.lganame === e.target.value);
         if (feature) {
@@ -1296,6 +1348,12 @@ const app = {
               }
             });
           }
+          // In raster mode: fit bounds and auto-clip to the selected LGA
+          if (document.getElementById('rasterLayer')?.checked) {
+            const boundary = this.state.data.lgasBoundary?.features?.find(f => f.properties.lganame === e.target.value);
+            if (boundary) this.map.fitBounds(L.geoJSON(boundary).getBounds(), { padding:[40,40] });
+            await this.applyRasterClip(e.target.value);
+          }
           this.state.selectedFeature = feature;
           this.updateAnalyticsPanel();
           this._highlightLGA(e.target.value);
@@ -1305,6 +1363,11 @@ const app = {
             const activeTab = document.querySelector('.sa-tab.active')?.dataset?.tab;
             if (activeTab) this.renderSATab(activeTab);
           }
+        }
+      } else {
+        // "All LGAs" selected — reset raster clip
+        if (document.getElementById('rasterLayer')?.checked) {
+          await this.applyRasterClip(null);
         }
       }
     });
@@ -2017,6 +2080,59 @@ const app = {
         </tr>`;
       }).join('');
     }
+
+    // ── Contextual interpretation cards for outliers ──
+    const interpEl = document.getElementById('correlationInterpretation');
+    if (interpEl) {
+      const outliers = points.filter(p => {
+        const zx = (p.x - meanX) / (stdX || 1);
+        const zy = (p.y - meanY) / (stdY || 1);
+        return Math.abs(zx) > 1.5 || Math.abs(zy) > 1.5;
+      });
+
+      if (!outliers.length) {
+        interpEl.innerHTML = '';
+      } else {
+        const noteText = 'Note: Anomalous readings may also result from agricultural burning, vehicular congestion, wind direction, or other environmental factors. Field verification is recommended before attributing anomalies to a single source.';
+        const cards = outliers.map(p => {
+          const zx   = (p.x - meanX) / (stdX || 1);
+          const zy   = (p.y - meanY) / (stdY || 1);
+          const highX = zx > 1.5, lowX  = zx < -1.5;
+          const highY = zy > 1.5, lowY  = zy < -1.5;
+
+          let bodyText;
+          if ((highX || lowX) && (highY || lowY)) {
+            if (highX && highY) {
+              bodyText = `Elevated ${xLabel} and ${yLabel} levels may indicate landfill emissions, vehicular congestion, industrial activity, or waste burning in this area.`;
+            } else if (lowX && lowY) {
+              bodyText = `Unusually low emissions relative to the Lagos average may reflect atypical atmospheric dispersion, low urban density, or limited combustion activity.`;
+            } else {
+              bodyText = `Elevated ${highX ? xLabel : yLabel} relative to ${highX ? yLabel : xLabel} suggests an atypical gas profile — possible source differentiation between combustion and decomposition processes.`;
+            }
+          } else if (highX || highY) {
+            const hiGas = highX ? xLabel : yLabel;
+            const loGas = highX ? yLabel : xLabel;
+            bodyText = `Elevated ${hiGas} relative to ${loGas} suggests an atypical gas profile — possible source differentiation between combustion and decomposition processes.`;
+          } else {
+            bodyText = `Unusually low emissions relative to the Lagos average may reflect atypical atmospheric dispersion, low urban density, or limited combustion activity.`;
+          }
+
+          const statusParts = [];
+          if (highX) statusParts.push(`HIGH ${xLabel}`);
+          else if (lowX) statusParts.push(`LOW ${xLabel}`);
+          if (highY) statusParts.push(`HIGH ${yLabel}`);
+          else if (lowY) statusParts.push(`LOW ${yLabel}`);
+
+          return `<div class="corr-card">
+            <div class="corr-card-lga">${p.name} <span style="font-size:9px;font-weight:400;color:var(--t2)">(${statusParts.join(', ')})</span></div>
+            <div>${bodyText}</div>
+            <div class="corr-card-note">${noteText}</div>
+          </div>`;
+        }).join('');
+
+        interpEl.innerHTML = `<div style="font-size:10px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.5px;margin:10px 0 6px">Outlier Interpretations</div>${cards}`;
+      }
+    }
   },
 
 
@@ -2186,7 +2302,60 @@ const app = {
   getAOIMask() {
     const boundary = this.state.data.lgasBoundary;
     if (!boundary?.features?.length) return null;
+    if (this.state.rasterClipLGA) {
+      const f = boundary.features.find(f => f.properties.lganame === this.state.rasterClipLGA);
+      if (f) return f;
+    }
     return boundary.features.length === 1 ? boundary.features[0] : boundary;
+  },
+
+  async applyRasterClip(lgaName) {
+    this.state.rasterClipLGA = lgaName || null;
+    this._updateClipButton();
+    if (document.getElementById('rasterLayer')?.checked) {
+      await this.addRasterLayer();
+    }
+    if (lgaName) {
+      const boundary = this.state.data.lgasBoundary?.features?.find(f => f.properties.lganame === lgaName);
+      if (boundary) this.map.fitBounds(L.geoJSON(boundary).getBounds(), { padding: [40, 40] });
+    }
+  },
+
+  _updateClipButton() {
+    const btn = document.getElementById('draw-clip-btn');
+    if (!btn) return;
+    const isClipped = !!this.state.rasterClipLGA;
+    btn.classList.toggle('active', isClipped);
+    btn.title = isClipped
+      ? `Clipped to ${this.state.rasterClipLGA} — click to reset`
+      : 'Clip raster to selected LGA';
+  },
+
+  _addClipMask(lgaName) {
+    this._removeClipMask();
+    if (!lgaName || !window.turf) return;
+    const lgaFeat = this.state.data.lgasBoundary?.features?.find(f => f.properties.lganame === lgaName);
+    if (!lgaFeat) return;
+    try {
+      const world   = turf.bboxPolygon([-180, -90, 180, 90]);
+      const inverse = turf.difference(world, lgaFeat);
+      if (!inverse) return;
+      const bgColor = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#070c14';
+      this.layers.clipMask = L.geoJSON(inverse, {
+        style: { fillColor: bgColor, fillOpacity: 1, stroke: false, weight: 0, interactive: false },
+      }).addTo(this.map);
+      // Keep overlay layers on top
+      if (this.layers.geeLGALabels) this.layers.geeLGALabels.bringToFront();
+      if (this.layers.lagosStateBoundary) this.layers.lagosStateBoundary.bringToFront();
+      if (this.layers.points) this.layers.points.bringToFront();
+    } catch(e) { console.warn('Clip mask error:', e); }
+  },
+
+  _removeClipMask() {
+    if (this.layers.clipMask) {
+      this.map.removeLayer(this.layers.clipMask);
+      this.layers.clipMask = null;
+    }
   },
 
   isPointInsideAOI(lat, lng) {
@@ -2345,6 +2514,7 @@ const app = {
       this.map.removeLayer(this.layers.raster);
       this.layers.raster = null;
     }
+    this._removeClipMask();
     const year   = this.state.currentYear;
     const metric = this.state.currentMetric;
     const metricName = { ch4:'CH₄', no2:'NO₂', co:'CO', isi:'ISI', hotspots:'Hotspots' }[metric] || metric.toUpperCase();
@@ -2383,7 +2553,8 @@ const app = {
     const bandIdx = this.BAND_INDEX[metric] ?? 0;
     const aoiMask = this.getAOIMask();
 
-    // Colour scales per metric
+    // Colour scales per metric — pre-convert hex stops to [r,g,b] arrays once
+    const hexToRgb = h => [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)];
     const scales = {
       ch4: { min: 1750, max: 2100, colors: ['#16a34a','#84cc16','#facc15','#f97316','#dc2626'] },
       no2: { min: 0,     max: 0.00020, colors: ['#16a34a','#84cc16','#facc15','#f97316','#dc2626'] },
@@ -2391,18 +2562,20 @@ const app = {
       isi: { min: 0.2,   max: 0.7,    colors: ['#16a34a','#84cc16','#facc15','#f97316','#dc2626'] },
     };
     const scale = scales[metric] || scales.ch4;
+    const rgbStops = scale.colors.map(hexToRgb);
+    const nStops   = rgbStops.length - 1;
+    const { min: sMin, max: sMax } = scale;
 
-    // Interpolate colour
+    // Interpolate colour — hot path, runs per pixel
     const getColor = (val) => {
-      if (val === null || isNaN(val)) return null;
-      const t = Math.max(0, Math.min(1, (val - scale.min) / (scale.max - scale.min)));
-      const stops = scale.colors;
-      const idx   = t * (stops.length - 1);
-      const lo    = Math.floor(idx), hi = Math.ceil(idx);
-      const f     = idx - lo;
-      const hexToRgb = h => [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)];
-      const c1 = hexToRgb(stops[lo]), c2 = hexToRgb(stops[hi] || stops[lo]);
-      return `rgba(${Math.round(c1[0]+(c2[0]-c1[0])*f)},${Math.round(c1[1]+(c2[1]-c1[1])*f)},${Math.round(c1[2]+(c2[2]-c1[2])*f)},0.7)`;
+      if (val === null || isNaN(val) || val <= 0) return null;
+      const t   = Math.max(0, Math.min(1, (val - sMin) / (sMax - sMin)));
+      const idx = t * nStops;
+      const lo  = idx | 0;
+      const hi  = lo < nStops ? lo + 1 : lo;
+      const f   = idx - lo;
+      const c1  = rgbStops[lo], c2 = rgbStops[hi];
+      return `rgba(${(c1[0]+(c2[0]-c1[0])*f+.5)|0},${(c1[1]+(c2[1]-c1[1])*f+.5)|0},${(c1[2]+(c2[2]-c1[2])*f+.5)|0},0.7)`;
     };
 
     if (this.state.geeMode) {
@@ -2415,6 +2588,7 @@ const app = {
       if (document.getElementById('rasterLayer')?.checked) {
         this.layers.raster.once('load', onRasterLoad);
         this.layers.raster.addTo(this.map);
+        if (this.state.rasterClipLGA) this._addClipMask(this.state.rasterClipLGA);
         if (this.layers.lgas)   this.layers.lgas.bringToFront();
         if (this.layers.points) this.layers.points.bringToFront();
       } else {
@@ -2423,41 +2597,127 @@ const app = {
       }
       this.setupGEEClickHandler();
     } else {
-      // ── Local GeoTIFF fallback ──────────────────────────
-      const rasterOptions = {
-        georaster,
-        opacity: 0.75,
-        band: bandIdx,
-        pixelValuesToColorFn: (values) => {
-          const val = values[bandIdx];
-          if (val === null || isNaN(val) || val <= 0) return null;
-          return getColor(val);
-        },
-        resolution: 256,
-      };
-      if (aoiMask) {
-        rasterOptions.mask = aoiMask;
-        rasterOptions.mask_strategy = 'inside';
-      }
-      this.layers.raster = new GeoRasterLayer(rasterOptions);
+      // ── Local GeoTIFF — render once to a static image overlay ──
+      // Image overlays scale with the map without re-rendering on zoom,
+      // pan, or basemap/theme changes.
+      this.layers.raster = this.renderRasterToImageOverlay(georaster, metric, aoiMask);
       if (document.getElementById('rasterLayer')?.checked) {
-        this.layers.raster.once('load', onRasterLoad);
         this.layers.raster.addTo(this.map);
+        if (this.state.rasterClipLGA) this._addClipMask(this.state.rasterClipLGA);
         if (this.layers.lgas)   this.layers.lgas.bringToFront();
         if (this.layers.points) this.layers.points.bringToFront();
+        onRasterLoad();
       } else {
         clearTimeout(toastTimer);
         document.getElementById('raster-loading-toast')?.remove();
       }
       this.setupRasterClickHandler(georaster);
+      this._prefetchAllRasters();
     }
   },
 
+  _prefetchAllRasters() {
+    const years = this.state.availableYears;
+    years.forEach((y, i) => {
+      if (!this.state.rasterData[y]) {
+        // Stagger by 600 ms each to avoid hammering the network and blocking parsing
+        setTimeout(() => {
+          if (!this.state.rasterData[y]) this.loadRaster(y);
+        }, i * 600);
+      }
+    });
+  },
+
+  // Render georaster pixels to a static L.imageOverlay so the raster is
+  // unaffected by zoom, pan, basemap swaps, or theme changes.
+  renderRasterToImageOverlay(georaster, metric, aoiMask) {
+    const bandIdx  = this.BAND_INDEX[metric] ?? 0;
+    const { width, height, xmin, xmax, ymin, ymax, values, noDataValue } = georaster;
+
+    const hexToRgb = h => [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)];
+    const scales = {
+      ch4: { min: 1750,  max: 2100,    colors: ['#16a34a','#84cc16','#facc15','#f97316','#dc2626'] },
+      no2: { min: 0,     max: 0.00020, colors: ['#16a34a','#84cc16','#facc15','#f97316','#dc2626'] },
+      co:  { min: 0.02,  max: 0.08,    colors: ['#16a34a','#84cc16','#facc15','#f97316','#dc2626'] },
+      isi: { min: 0.2,   max: 0.7,     colors: ['#16a34a','#84cc16','#facc15','#f97316','#dc2626'] },
+    };
+    const scale    = scales[metric] || scales.ch4;
+    const rgbStops = scale.colors.map(hexToRgb);
+    const nStops   = rgbStops.length - 1;
+    const { min: sMin, max: sMax } = scale;
+    const nodata   = noDataValue;
+    const bandData = values[bandIdx];
+
+    // Paint every pixel onto an offscreen canvas
+    const offscreen = document.createElement('canvas');
+    offscreen.width  = width;
+    offscreen.height = height;
+    const offCtx = offscreen.getContext('2d');
+    const imgD   = offCtx.createImageData(width, height);
+    const px     = imgD.data;
+
+    for (let row = 0; row < height; row++) {
+      for (let col = 0; col < width; col++) {
+        const i   = (row * width + col) * 4;
+        const raw = bandData?.[row]?.[col];
+        if (raw == null || isNaN(raw) || raw === nodata || raw < -9000 || raw <= 0) {
+          px[i + 3] = 0;
+          continue;
+        }
+        const t  = Math.max(0, Math.min(1, (raw - sMin) / (sMax - sMin)));
+        const si = t * nStops;
+        const lo = si | 0;
+        const hi = lo < nStops ? lo + 1 : lo;
+        const f  = si - lo;
+        const c1 = rgbStops[lo], c2 = rgbStops[hi];
+        px[i]     = (c1[0] + (c2[0] - c1[0]) * f + 0.5) | 0;
+        px[i + 1] = (c1[1] + (c2[1] - c1[1]) * f + 0.5) | 0;
+        px[i + 2] = (c1[2] + (c2[2] - c1[2]) * f + 0.5) | 0;
+        px[i + 3] = 191; // 75 % opacity baked in
+      }
+    }
+    offCtx.putImageData(imgD, 0, 0);
+
+    // Clip to AOI polygon using the canvas 2D path API — O(vertices), not O(pixels)
+    const final = document.createElement('canvas');
+    final.width  = width;
+    final.height = height;
+    const fCtx   = final.getContext('2d');
+
+    if (aoiMask) {
+      const geoToPixel = (lng, lat) => [
+        (lng - xmin) / (xmax - xmin) * width,
+        (ymax - lat) / (ymax - ymin) * height,
+      ];
+      const addRing = ring => {
+        ring.forEach(([lng, lat], i) => {
+          const [x, y] = geoToPixel(lng, lat);
+          if (i === 0) fCtx.moveTo(x, y); else fCtx.lineTo(x, y);
+        });
+        fCtx.closePath();
+      };
+      const addGeom = geom => {
+        if (!geom) return;
+        if (geom.type === 'Polygon')      geom.coordinates.forEach(addRing);
+        else if (geom.type === 'MultiPolygon') geom.coordinates.forEach(p => p.forEach(addRing));
+      };
+      fCtx.beginPath();
+      if (aoiMask.type === 'Feature')           addGeom(aoiMask.geometry);
+      else if (aoiMask.type === 'FeatureCollection') aoiMask.features.forEach(f => addGeom(f.geometry));
+      fCtx.clip('evenodd');
+    }
+
+    fCtx.drawImage(offscreen, 0, 0);
+    const dataUrl = final.toDataURL('image/png');
+    const bounds  = L.latLngBounds([[ymin, xmin], [ymax, xmax]]);
+    return L.imageOverlay(dataUrl, bounds, { opacity: 1, interactive: false, pane: 'overlayPane' });
+  },
 
   setupGEEClickHandler() {
     if (this._geeClickHandler) this.map.off('click', this._geeClickHandler);
     this._geeClickHandler = async (e) => {
       if (!document.getElementById('rasterLayer')?.checked) return;
+      if (this.state.activeDraw) return; // suppress during active digitizing
       const { lat, lng } = e.latlng;
       if (!this.isPointInsideAOI(lat, lng)) return;
       const year = parseInt(this.state.currentYear);
@@ -2479,6 +2739,9 @@ const app = {
         }
 
         this.state.clickedPoint = { lat, lng, ...vals, lgaName };
+        // Set selectedFeature so the full LGA report is available
+        const lgaEmFeat = this.state.data.lgas?.features?.find(f => f.properties.lganame === lgaName);
+        if (lgaEmFeat) this.state.selectedFeature = lgaEmFeat;
         this.updateRasterInspector({ lat, lng, ...vals, lgaName });
 
         // Fetch trend data async
@@ -2540,6 +2803,7 @@ const app = {
 
     this._rasterClickHandler = async (e) => {
       if (!document.getElementById('rasterLayer')?.checked) return;
+      if (this.state.activeDraw) return; // suppress during active digitizing
       const { lat, lng } = e.latlng;
       if (!this.isPointInsideAOI(lat, lng)) return;
 
@@ -2576,6 +2840,9 @@ const app = {
       }
 
       this.state.clickedPoint = { lat, lng, ch4, no2: no2c, co, isi, hot, lgaName };
+      // Set selectedFeature so the full LGA report is available
+      const lgaEmFeat = this.state.data.lgas?.features?.find(f => f.properties.lganame === lgaName);
+      if (lgaEmFeat) this.state.selectedFeature = lgaEmFeat;
       this.updateRasterInspector({ lat, lng, ch4, no2: no2c, co, isi, hot, lgaName });
       this.updateChartsForPoint(lat, lng, georaster);
     };
@@ -2656,8 +2923,8 @@ const app = {
 
     const pointVals = { ch4: [], no2: [], co: [] };
 
-    for (const year of years) {
-      const gr = await this.loadRaster(year);
+    const yearResults = await Promise.all(years.map(y => this.loadRaster(y)));
+    for (const gr of yearResults) {
       if (!gr) { pointVals.ch4.push(null); pointVals.no2.push(null); pointVals.co.push(null); continue; }
 
       const col = Math.floor((lng - gr.xmin) / gr.pixelWidth);
@@ -2790,7 +3057,7 @@ const app = {
         });
       }
       const tot = b1+b5+bk;
-      return '<div class="lf-card">' +
+      return '<div class="lf-card" data-lfname="'+name+'" style="cursor:pointer">' +
         '<div class="lf-card-header">' +
           '<div style="flex:1">' +
             '<div class="lf-name">'+name+'</div>' +
@@ -2808,6 +3075,12 @@ const app = {
         '</div>' +
       '</div>';
     }).join('');
+
+    c.querySelectorAll('.lf-card').forEach(card => {
+      card.addEventListener('click', () => {
+        this.highlightLandfill(card.dataset.lfname);
+      });
+    });
   },
 
   // ── Basemap selector dialog for report generation ─────────────
@@ -2849,16 +3122,184 @@ const app = {
     });
   },
 
+  async generateStateReport() {
+    const year     = this.state.currentYear;
+    const prevYear = String(parseInt(year) - 1);
+    const date     = new Date().toLocaleDateString('en-GB', { day:'numeric', month:'long', year:'numeric' });
+    const feats    = this.state.data.lgas.features;
+    const years    = this.getYears();
+    const riskColors = { low:'#16a34a', moderate:'#ca8a04', elevated:'#f97316', high:'#dc2626', critical:'#7c2d12' };
+
+    const stateAvg = (m, y) => {
+      const vals = feats.map(f => this.getMetricValue(f, m, y) || 0).filter(v => v > 0);
+      return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+    };
+    const stateAvgISI = (y) => {
+      const vals = feats.map(f => f.properties[`isi_${y}`] || 0).filter(v => v > 0);
+      return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+    };
+    const centroidOf = (f) => {
+      const boundary = this.state.data.lgasBoundary?.features?.find(b => b.properties.lganame === f.properties.lganame);
+      const geom = boundary?.geometry || f.geometry;
+      if (!geom) return null;
+      if (geom.type === 'Point') return { lat: geom.coordinates[1], lon: geom.coordinates[0] };
+      const ring = geom.type === 'Polygon' ? geom.coordinates[0] : geom.type === 'MultiPolygon' ? geom.coordinates[0]?.[0] : null;
+      if (!ring) return null;
+      return { lon: ring.reduce((s, c) => s + c[0], 0) / ring.length, lat: ring.reduce((s, c) => s + c[1], 0) / ring.length };
+    };
+
+    // ── Statewide summary rows ──
+    const mLabels = { ch4:'CH₄ Methane', no2:'NO₂ Nitrogen Dioxide', co:'CO Carbon Monoxide', isi:'ISI Risk Score' };
+    const mUnits  = { ch4:'mol/m²', no2:'mol/m²', co:'mol/m²', isi:'index' };
+    const summaryRows = ['ch4','no2','co','isi'].map(m => {
+      const avg  = m === 'isi' ? stateAvgISI(year)     : stateAvg(m, year);
+      const prev = m === 'isi' ? stateAvgISI(prevYear) : stateAvg(m, prevYear);
+      const pct  = prev > 0 ? ((avg - prev) / prev * 100).toFixed(1) : 'N/A';
+      const pc   = Number(pct) > 0 ? '#dc2626' : Number(pct) < 0 ? '#16a34a' : '#64748b';
+      const dp   = m === 'isi' ? 4 : 6;
+      return `<tr><td style="font-weight:600">${mLabels[m]}</td>`
+        + `<td style="font-weight:700;color:#0284c7">${avg.toFixed(dp)}</td>`
+        + `<td style="color:#64748b">${prev.toFixed(dp)}</td>`
+        + `<td style="font-weight:700;color:${pc}">${pct !== 'N/A' ? (Number(pct) > 0 ? '+' : '') + pct + '%' : 'N/A'}</td>`
+        + `<td style="font-size:9px;color:#94a3b8">${mUnits[m]}</td></tr>`;
+    }).join('');
+
+    // ── Top 5 / bottom 5 by ISI ──
+    const sortedByISI = [...feats].map(f => ({ name: f.properties.lganame, isi: f.properties[`isi_${year}`] || 0 }))
+      .sort((a, b) => b.isi - a.isi);
+    const lgaTableRows = (list) => list.map(item => {
+      const r = this.getEriClassification(item.isi);
+      const rc = riskColors[r.css] || '#888';
+      return `<tr><td style="font-weight:600">${item.name}</td>`
+        + `<td style="font-weight:700;color:#0284c7">${item.isi.toFixed(4)}</td>`
+        + `<td><span style="background:${rc}18;color:${rc};padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;border:1px solid ${rc}44">${r.label}</span></td></tr>`;
+    }).join('');
+
+    // ── Anomaly detection — 1.5σ on all 4 metrics ──
+    const anomalyRows = ['ch4','no2','co','isi'].flatMap(m => {
+      const vals = feats.map(f => m === 'isi' ? (f.properties[`isi_${year}`] || 0) : (this.getMetricValue(f, m, year) || 0));
+      const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+      const std  = Math.sqrt(vals.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / vals.length);
+      return feats.map((f, i) => ({ name: f.properties.lganame, m, val: vals[i], z: std > 0 ? (vals[i] - mean) / std : 0 }))
+        .filter(v => v.z > 1.5).sort((a, b) => b.z - a.z)
+        .map(v => {
+          const feat = feats.find(f2 => f2.properties.lganame === v.name);
+          const isi  = feat?.properties[`isi_${year}`] || 0;
+          const risk = this.getEriClassification(isi);
+          const rc   = riskColors[risk.css] || '#888';
+          const dp   = m === 'isi' ? 4 : 6;
+          return `<tr><td style="font-weight:600">${v.name}</td>`
+            + `<td style="font-size:10px;color:#64748b">${mLabels[m]}</td>`
+            + `<td style="font-weight:700;color:#dc2626">${v.val.toFixed(dp)}</td>`
+            + `<td style="font-weight:700;color:#dc2626">${v.z.toFixed(2)}σ</td>`
+            + `<td><span style="background:${rc}18;color:${rc};padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;border:1px solid ${rc}44">${risk.label}</span></td></tr>`;
+        });
+    }).join('');
+
+    // ── Landfill status + nearest LGA ──
+    const lfRows = (this.state.data.landfills?.features || []).filter(lf => lf.geometry).map(lf => {
+      const nm  = lf.properties.Name || lf.properties.name || 'Landfill';
+      const raw = lf.properties.Status || lf.properties.status || '';
+      const s   = raw.toString().trim().toLowerCase();
+      let stLabel, stColor;
+      if (!s || s === '0')                                   { stLabel = 'Active';                          stColor = '#16a34a'; }
+      else if (s.includes('scheduled'))                      { stLabel = 'Scheduled for Decommissioning';   stColor = '#f97316'; }
+      else if (s.includes('being'))                          { stLabel = 'Being Decommissioned';            stColor = '#ca8a04'; }
+      else if (s.includes('rehabilitation') || s.includes('environmental stud')) { stLabel = 'Under Rehabilitation Study'; stColor = '#3b82f6'; }
+      else if (s.includes('closed') || s.includes('dormant')) { stLabel = 'Closed / Dormant';              stColor = '#64748b'; }
+      else                                                   { stLabel = raw.trim() || 'Active';            stColor = '#16a34a'; }
+      const [lon, lat] = lf.geometry.coordinates;
+      let nearLGA = '-', minD = Infinity;
+      feats.forEach(f => {
+        const c = centroidOf(f);
+        if (!c) return;
+        const d = L.latLng(lat, lon).distanceTo(L.latLng(c.lat, c.lon));
+        if (d < minD) { minD = d; nearLGA = f.properties.lganame; }
+      });
+      return `<tr><td style="font-weight:600">${nm}</td>`
+        + `<td><span style="background:${stColor}18;color:${stColor};padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;border:1px solid ${stColor}44">${stLabel}</span></td>`
+        + `<td>${nearLGA}</td></tr>`;
+    }).join('');
+
+    // ── Buffer exposure count (centroids within 1 km) ──
+    const lgasWithin1km = feats.filter(f => {
+      const c = centroidOf(f);
+      if (!c) return false;
+      return (this.state.data.landfills?.features || []).some(lf => {
+        if (!lf.geometry) return false;
+        const [lo, la] = lf.geometry.coordinates;
+        return L.latLng(c.lat, c.lon).distanceTo(L.latLng(la, lo)) <= 1000;
+      });
+    }).length;
+
+    // ── 8-year statewide average trend table ──
+    const trendRows = years.map(y => {
+      const avgCH4 = stateAvg('ch4', y);
+      const avgNO2 = stateAvg('no2', y);
+      const avgCO  = stateAvg('co',  y);
+      const avgISI = stateAvgISI(y);
+      const r  = this.getEriClassification(avgISI);
+      const rc = riskColors[r.css] || '#888';
+      return `<tr style="${y === year ? 'background:#eff6ff;font-weight:600' : ''}">`
+        + `<td>${y}</td><td>${avgCH4.toFixed(6)}</td><td>${avgNO2.toFixed(6)}</td>`
+        + `<td>${avgCO.toFixed(6)}</td><td>${avgISI.toFixed(4)}</td>`
+        + `<td><span style="background:${rc}18;color:${rc};padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;border:1px solid ${rc}44">${r.label}</span></td></tr>`;
+    }).join('');
+
+    // ── Chart images ──
+    const trendImg = this.charts.trend           ? this.charts.trend.canvas.toDataURL('image/png')           : '';
+    const barImg   = this.charts.lgaComparison   ? this.charts.lgaComparison.canvas.toDataURL('image/png')   : '';
+
+    // ── Logo ──
+    let logoBase64 = '';
+    try {
+      const r = await fetch('logo.png');
+      if (r.ok) {
+        const blob = await r.blob();
+        logoBase64 = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(blob); });
+      }
+    } catch(e) {}
+
+    const totalLGAs    = feats.length;
+    const avgISI       = stateAvgISI(year);
+    const prevAvgISI   = stateAvgISI(prevYear);
+    const overallRisk  = this.getEriClassification(avgISI);
+    const orc          = riskColors[overallRisk.css] || '#888';
+    const isiYoY       = prevAvgISI > 0 ? ((avgISI - prevAvgISI) / prevAvgISI * 100).toFixed(1) : 'N/A';
+    const lfCount      = this.state.data.landfills?.features?.length || 0;
+
+    const css = `*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Segoe UI',Arial,sans-serif;background:#f8fafc;color:#1e293b;padding:24px}.page{max-width:900px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.1)}.ab{height:3px;background:linear-gradient(90deg,#00d4ff,#00e5a0,#a78bfa)}.rh{background:linear-gradient(135deg,#0a1120,#0d1f3c);padding:24px 28px;display:flex;justify-content:space-between;align-items:flex-start}.rh h1{font-size:20px;font-weight:800;color:#00d4ff}.rh p{font-size:11px;color:#7a8fa8;margin-top:3px}.rhr{text-align:right}.ln{font-size:19px;font-weight:700;color:#fff}.mt{font-size:10px;color:#7a8fa8;margin-top:4px}.bd{padding:24px 28px;display:flex;flex-direction:column;gap:20px}.st{font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;display:flex;align-items:center;gap:8px}.st::after{content:'';flex:1;height:1px;background:#e2e8f0}.kg{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.kb{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px}.kl{font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px}.kv{font-size:14px;font-weight:700;color:#1e293b;line-height:1.3}.ku{font-size:9px;color:#94a3b8;margin-top:2px}.tg{display:grid;grid-template-columns:1fr 1fr;gap:14px}.cg{display:grid;grid-template-columns:1fr 1fr;gap:14px}.cl{font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}table{width:100%;border-collapse:collapse;font-size:11px}thead tr{background:#f1f5f9}th{padding:7px 10px;text-align:left;font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;border-bottom:1px solid #e2e8f0}td{padding:6px 10px;border-bottom:1px solid #f1f5f9;color:#334155;vertical-align:middle}tr:last-child td{border-bottom:none}.ft{background:#f8fafc;border-top:1px solid #e2e8f0;padding:12px 28px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8}.ac{text-align:center;padding:20px;display:flex;justify-content:center;gap:10px}@media print{body{background:#fff;padding:0}.page{box-shadow:none;border-radius:0}.ac{display:none!important}}`;
+
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Lagos State Emission Report</title><script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"><\/script><style>${css}</style></head><body><div class="page"><div class="ab"></div>
+<div class="rh"><div style="display:flex;align-items:center;gap:12px">${logoBase64 ? `<img src="${logoBase64}" style="width:64px;height:64px;object-fit:contain;border-radius:8px">` : ''}<div><h1>Lagos State Emission Report</h1><p>Statewide Gas Emissions Overview &nbsp;·&nbsp; Sentinel-5P &nbsp;·&nbsp; All ${totalLGAs} LGAs</p></div></div><div class="rhr"><div class="ln">Lagos State</div><div class="mt">Year: ${year} &nbsp;·&nbsp; Generated: ${date}</div></div></div>
+<div class="bd">
+<div><div class="st">State Overview</div><div class="kg"><div class="kb"><div class="kl">LGAs Surveyed</div><div class="kv">${totalLGAs}</div></div><div class="kb"><div class="kl">Avg ISI Score</div><div class="kv" style="color:${orc}">${avgISI.toFixed(4)}</div><div class="ku">${overallRisk.label}</div></div><div class="kb"><div class="kl">ISI YoY Change</div><div class="kv" style="color:${Number(isiYoY)>0?'#dc2626':'#16a34a'}">${isiYoY !== 'N/A' ? (Number(isiYoY)>0?'+':'') + isiYoY + '%' : 'N/A'}</div><div class="ku">vs ${prevYear}</div></div><div class="kb"><div class="kl">Landfill Sites</div><div class="kv">${lfCount}</div></div></div></div>
+<div><div class="st">Statewide Gas Summary (${year} vs ${prevYear})</div><table><thead><tr><th>Gas</th><th>Avg (${year})</th><th>Avg (${prevYear})</th><th>YoY Change</th><th>Unit</th></tr></thead><tbody>${summaryRows}</tbody></table></div>
+<div class="tg"><div><div class="st">Top 5 Highest Risk LGAs</div><table><thead><tr><th>LGA</th><th>ISI</th><th>Risk</th></tr></thead><tbody>${lgaTableRows(sortedByISI.slice(0,5))}</tbody></table></div><div><div class="st">Bottom 5 Lowest Risk LGAs</div><table><thead><tr><th>LGA</th><th>ISI</th><th>Risk</th></tr></thead><tbody>${lgaTableRows([...sortedByISI].reverse().slice(0,5))}</tbody></table></div></div>
+<div><div class="st">Anomaly Summary — LGAs flagged at 1.5σ (${year})</div>${anomalyRows ? `<table><thead><tr><th>LGA</th><th>Gas</th><th>Value</th><th>Z-Score</th><th>Risk</th></tr></thead><tbody>${anomalyRows}</tbody></table>` : '<div style="padding:12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;font-size:11px;color:#16a34a;font-weight:600">✅ No LGAs flagged anomalous at 1.5σ threshold.</div>'}</div>
+<div><div class="st">Landfill Status</div><table><thead><tr><th>Site Name</th><th>Status</th><th>Nearest LGA</th></tr></thead><tbody>${lfRows}</tbody></table></div>
+<div><div class="st">Buffer Exposure Summary</div><div style="background:#eff6ff;border:1px solid #bfdbfe;border-left:4px solid #3b82f6;border-radius:8px;padding:12px 16px"><div style="font-size:14px;font-weight:700;color:#1e40af">${lgasWithin1km} of ${totalLGAs} LGAs</div><div style="font-size:11px;color:#475569;margin-top:3px">have centroids within 1 km of at least one monitored landfill site.</div></div></div>
+<div><div class="st">8-Year Statewide Average Trend</div><table><thead><tr><th>Year</th><th>Avg CH₄</th><th>Avg NO₂</th><th>Avg CO</th><th>Avg ISI</th><th>Risk Level</th></tr></thead><tbody>${trendRows}</tbody></table></div>
+<div class="cg">${trendImg ? `<div><div class="cl">Emission Trend Chart</div><img src="${trendImg}" style="width:100%;border-radius:6px;border:1px solid #e2e8f0"/></div>` : '<div></div>'}${barImg ? `<div><div class="cl">Top 10 LGAs — Bar Chart</div><img src="${barImg}" style="width:100%;border-radius:6px;border:1px solid #e2e8f0"/></div>` : '<div></div>'}</div>
+</div><div class="ft"><span>Lagos ERM &nbsp;·&nbsp; Geoinfotech Resources Limited</span><span>Lagos State Report &nbsp;·&nbsp; ${date}</span></div></div>
+<div class="ac"><button onclick="window.print()" style="background:#0284c7;color:#fff;border:none;padding:10px 28px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">⬇ Download PDF</button><button onclick="window.close()" style="background:#f1f5f9;color:#334155;border:1px solid #e2e8f0;padding:10px 28px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">Close</button></div>
+</body></html>`;
+
+    const win = window.open('', '_blank', 'width=970,height=800,scrollbars=yes');
+    if (!win) { this.showNotification('Pop-up blocked. Allow pop-ups for this page.', 'info'); return; }
+    win.document.write(html);
+    win.document.close();
+  },
+
   async generateReport() {
     const year    = this.state.currentYear;
     const date    = new Date().toLocaleDateString('en-GB', { day:'numeric', month:'long', year:'numeric' });
     const drawCtx = this.state.currentDrawContext;
     const feature = this.state.selectedFeature;
 
-    // Guard: must have something to report on before showing any dialog
+    // No selection → generate statewide report
     if (!drawCtx && !feature && !this.state.clickedPoint) {
-      this.showNotification('Select an LGA on the map, or draw a point / transect / polygon first.', 'info');
-      return;
+      return this.generateStateReport();
     }
 
     // Ask user which basemap to embed in the report map image
@@ -2869,6 +3310,10 @@ const app = {
       if (drawCtx.type === 'point')     return this.generateDrawPointReport(drawCtx, date, reportBasemap);
       if (drawCtx.type === 'transect')  return this.generateTransectReport(drawCtx, date, reportBasemap);
       if (drawCtx.type === 'zone')      return this.generateZoneReport(drawCtx, date, reportBasemap);
+    }
+    // Raster click with resolved LGA → full report with pixel section prepended
+    if (feature && this.state.clickedPoint && document.getElementById('rasterLayer')?.checked) {
+      return this.generateRasterLGAReport(feature, this.state.clickedPoint, date, reportBasemap);
     }
     if (!feature && this.state.clickedPoint) {
       return this.generateDrawPointReport({
@@ -3126,12 +3571,18 @@ const app = {
       }
     }
 
-    await Promise.all(jobs.map(j => new Promise(resolve => {
+    const tilePromise = j => new Promise(resolve => {
       const img = new Image(); img.crossOrigin = 'anonymous';
-      img.onload  = () => { ctx.drawImage(img, j.px, j.py, tSz, tSz); resolve(); };
-      img.onerror = () => resolve();
+      const guard = setTimeout(() => resolve(), 5000); // per-tile safety timeout
+      img.onload  = () => { clearTimeout(guard); ctx.drawImage(img, j.px, j.py, tSz, tSz); resolve(); };
+      img.onerror = () => { clearTimeout(guard); resolve(); };
       img.src = j.url;
-    })));
+    });
+    // Overall cap: don't wait more than 10 s for all tiles
+    await Promise.race([
+      Promise.all(jobs.map(tilePromise)),
+      new Promise(r => setTimeout(r, 10000)),
+    ]);
   },
 
   // Universal map snapshot — fetches basemap tiles directly then draws the feature overlay.
@@ -3282,6 +3733,176 @@ const app = {
       try { this.map.setView(prevCenter, prevZoom, { animate:false }); } catch (e) {}
     }
     return mapImg;
+  },
+
+  async generateRasterLGAReport(feature, pt, date, reportBasemap) {
+    const year  = this.state.currentYear;
+    const lgaName = feature.properties.lganame;
+    const ch4 = this.getMetricValue(feature,'ch4',year)||0;
+    const no2 = this.getMetricValue(feature,'no2',year)||0;
+    const co  = this.getMetricValue(feature,'co', year)||0;
+    const isi = feature.properties[`isi_${year}`] || 0;
+    const risk = this.getEriClassification(isi);
+    const prevYear = String(parseInt(year)-1);
+    const prevCH4  = this.getMetricValue(feature,'ch4',prevYear)||0;
+    const yoy = prevCH4 !== 0 ? ((ch4-prevCH4)/prevCH4*100).toFixed(1) : 'N/A';
+    const riskColors = { low:'#16a34a', moderate:'#ca8a04', elevated:'#f97316', high:'#dc2626', critical:'#7c2d12' };
+    const riskColor  = riskColors[risk.css] || '#888';
+    const years  = this.getYears();
+    const feats  = this.state.data.lgas.features;
+
+    // Trend rows
+    const tCH4 = years.map(y=>this.getMetricValue(feature,'ch4',y)||0);
+    const tNO2 = years.map(y=>this.getMetricValue(feature,'no2',y)||0);
+    const tCO  = years.map(y=>this.getMetricValue(feature,'co', y)||0);
+    const tISI = years.map(y=>feature.properties[`isi_${y}`]||0);
+    const trendRows = years.map((y,i)=>{
+      const r=this.getEriClassification(tISI[i]), rc=riskColors[r.css]||'#888';
+      const isCur = y===year ? 'style="background:#eff6ff;font-weight:600"' : '';
+      return `<tr ${isCur}><td>${y}</td><td>${tCH4[i]?tCH4[i].toFixed(6):'-'}</td><td>${tNO2[i]?tNO2[i].toFixed(6):'-'}</td><td>${tCO[i]?tCO[i].toFixed(6):'-'}</td><td>${tISI[i]?tISI[i].toFixed(4):'-'}</td><td><span style="background:${rc};color:#fff;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700">${r.label}</span></td></tr>`;
+    }).join('');
+
+    // Buffer analysis
+    const lgaCentroid = feature.geometry ? L.latLng(feature.geometry.coordinates[1], feature.geometry.coordinates[0]) : null;
+    const lgaBoundaryFeat = this.state.data.lgasBoundary?.features?.find(b => b.properties.lganame === lgaName);
+    const bufferRows = this.state.data.landfills.features.filter(lf=>lf.geometry).map(lf=>{
+      const [lo,la]=lf.geometry.coordinates, nm=lf.properties.Name||'Landfill';
+      const d=lgaCentroid?lgaCentroid.distanceTo(L.latLng(la,lo)):Infinity;
+      let zone,zc;
+      if(d<=100){zone='≤ 100 m';zc='#00e5a0'}else if(d<=500){zone='≤ 500 m';zc='#ffb547'}else if(d<=1000){zone='≤ 1 km';zc='#ff4d6a'}else{zone='> 1 km';zc='#3d5168'}
+      const T=window.turf, inLGA=T&&lgaBoundaryFeat?T.booleanPointInPolygon(T.point([lo,la]),lgaBoundaryFeat):false;
+      return {nm,d,zone,zc,inLGA};
+    }).sort((a,b)=>a.d-b.d);
+    const bufferTableRows = bufferRows.map(r=>`<tr><td style='font-weight:600'>${r.nm}</td><td>${Math.round(r.d).toLocaleString()} m</td><td><span style='background:${r.zc}22;color:${r.zc};padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;border:1px solid ${r.zc}44'>${r.zone}</span></td><td><span style='background:${r.inLGA?'rgba(0,212,255,0.15)':'#f1f5f9'};color:${r.inLGA?'#0284c7':'#94a3b8'};padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700'>${r.inLGA?'IN LGA':'OUTSIDE'}</span></td></tr>`).join('');
+
+    // Nearest landfill
+    let nearestDist=null, nearestName=null;
+    if (lgaCentroid && this.state.data.landfills) {
+      this.state.data.landfills.features.forEach(lf=>{
+        if(!lf.geometry)return;
+        const d=lgaCentroid.distanceTo(L.latLng(lf.geometry.coordinates[1],lf.geometry.coordinates[0]));
+        if(nearestDist===null||d<nearestDist){nearestDist=d;nearestName=lf.properties.Name||'Unnamed';}
+      });
+    }
+    const lfDisplay = nearestDist!==null?`${nearestName}<br/><small style="color:#94a3b8">${Math.round(nearestDist).toLocaleString()} m away</small>`:'-';
+
+    // Statewide context
+    const metrics3=['ch4','no2','co','isi'];
+    const mLabels={ch4:'CH₄',no2:'NO₂',co:'CO',isi:'ISI Score'};
+    const contextRows = metrics3.map(m=>{
+      const allVals=feats.map(f=>(m==='isi'?(f.properties['isi_'+year]||0):this.getMetricValue(f,m,year)||0)).filter(v=>v>0);
+      const avg=allVals.reduce((a,b)=>a+b,0)/allVals.length;
+      const lgaVal=m==='isi'?isi:(m==='ch4'?ch4:m==='no2'?no2:co)||0;
+      const sorted=[...allVals].sort((a,b)=>b-a);
+      const rank=sorted.indexOf(lgaVal)+1||sorted.findIndex(v=>v<=lgaVal)+1;
+      const pct=Math.round((1-(rank/allVals.length))*100);
+      const vColor=lgaVal>avg?'#dc2626':'#16a34a';
+      return `<tr><td style="font-weight:600">${mLabels[m]}</td><td style="color:${vColor};font-weight:700">${lgaVal.toFixed(m==='isi'?4:6)}</td><td>${avg.toFixed(m==='isi'?4:6)}</td><td style="font-weight:600">#${rank} / ${allVals.length}</td><td style="color:${vColor};font-weight:700">${pct}th</td></tr>`;
+    }).join('');
+
+    // Anomaly detection
+    const anomalyGases=[{key:'ch4',label:'CH₄',val:ch4},{key:'no2',label:'NO₂',val:no2},{key:'co',label:'CO',val:co},{key:'isi',label:'ISI Score',val:isi}];
+    const anomalyRows=anomalyGases.map(g=>{
+      const vals=feats.map(f=>g.key==='isi'?(f.properties['isi_'+year]||0):(this.getMetricValue(f,g.key,year)||0)).filter(v=>v>0);
+      const mean=vals.reduce((a,b)=>a+b,0)/vals.length;
+      const std=Math.sqrt(vals.reduce((s,v)=>s+Math.pow(v-mean,2),0)/vals.length);
+      const z=std>0?((g.val-mean)/std):0;
+      const flag=Math.abs(z)>1.5;
+      const zCol=z>1.5?'#dc2626':z<-1.5?'#16a34a':'#64748b';
+      return {label:g.label,val:g.val,mean,std,z,flag,zCol,key:g.key};
+    });
+    const anyAnomal=anomalyRows.some(r=>r.flag);
+    const anomalyTableRows=anomalyRows.map(r=>`<tr><td style="font-weight:600">${r.label}</td><td style="font-weight:700;color:${r.val>r.mean?'#dc2626':'#16a34a'}">${r.val.toFixed(r.key==='isi'?4:6)}</td><td>${r.mean.toFixed(r.key==='isi'?4:6)}</td><td>${r.std.toFixed(r.key==='isi'?4:6)}</td><td style="font-weight:700;color:${r.zCol}">${r.z.toFixed(2)}σ</td><td>${r.flag?`<span style="background:${r.z>0?'#dc262618':'#16a34a18'};color:${r.z>0?'#dc2626':'#16a34a'};padding:2px 8px;border-radius:99px;font-size:9px;font-weight:700;border:1px solid ${r.z>0?'#dc262644':'#16a34a44'}">${r.z>0?'⚠ HIGH':'↓ LOW'}</span>`:'<span style="color:#64748b;font-size:9px">—</span>'}</td></tr>`).join('');
+
+    // Bar chart image from live canvas
+    const barImg = this.charts.lgaComparison ? this.charts.lgaComparison.canvas.toDataURL('image/png') : '';
+
+    // Inline Chart.js script: trend line + composition doughnut
+    const chartScript = `const c1=document.getElementById('rC').getContext('2d');new Chart(c1,{type:'line',data:{labels:${JSON.stringify(years)},datasets:[{label:'CH₄',data:${JSON.stringify(tCH4)},borderColor:'#3b82f6',backgroundColor:'rgba(59,130,246,0.07)',borderWidth:2,tension:0.4,pointRadius:4,fill:true},{label:'NO₂',data:${JSON.stringify(tNO2)},borderColor:'#10b981',backgroundColor:'rgba(16,185,129,0.07)',borderWidth:2,tension:0.4,pointRadius:4,fill:true},{label:'CO',data:${JSON.stringify(tCO)},borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,0.07)',borderWidth:2,tension:0.4,pointRadius:4,fill:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:11},usePointStyle:true,padding:14}},tooltip:{mode:'index',intersect:false}},scales:{y:{beginAtZero:true,title:{display:true,text:'mol/m²',font:{size:10}},grid:{color:'rgba(0,0,0,0.05)'},ticks:{font:{size:10}}},x:{grid:{display:false},ticks:{font:{size:10}}}}}});const c2=document.getElementById('rD').getContext('2d');new Chart(c2,{type:'doughnut',data:{labels:['CH₄','NO₂','CO'],datasets:[{data:${JSON.stringify([ch4,no2,co])},backgroundColor:['#3b82f6','#10b981','#f59e0b'],borderWidth:0,hoverOffset:4}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{position:'bottom',labels:{font:{size:11},usePointStyle:true,padding:12}}}}});`;
+
+    // Logo + map image
+    let logoBase64='';
+    try{const r=await fetch('logo.png');if(r.ok){const b=await r.blob();logoBase64=await new Promise(res=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.readAsDataURL(b);});}}catch(e){}
+    let mapImg='';
+    try{
+      const bf=this.state.data.lgasBoundary?.features?.find(b=>b.properties.lganame===lgaName);
+      if(bf&&this.map)this.map.fitBounds(L.geoJSON(bf).getBounds(),{padding:[50,50],animate:false});
+      await new Promise(r=>setTimeout(r,80));
+      const mapEl=this.map.getContainer(),W=mapEl.offsetWidth,H=mapEl.offsetHeight;
+      const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;
+      const ctx2=canvas.getContext('2d');
+      await this._drawBasemapTiles(ctx2,reportBasemap||this.state.currentBasemap);
+      if(bf?.geometry){
+        ctx2.save();ctx2.strokeStyle='#00d4ff';ctx2.lineWidth=3;ctx2.shadowColor='#00d4ff';ctx2.shadowBlur=10;ctx2.fillStyle='rgba(0,212,255,0.10)';
+        const geom=bf.geometry,polys=geom.type==='Polygon'?[geom.coordinates]:geom.coordinates;
+        polys.forEach(poly=>poly.forEach(ring=>{ctx2.beginPath();ring.forEach(([lng2,lat2],i)=>{const p=this.map.latLngToContainerPoint(L.latLng(lat2,lng2));i===0?ctx2.moveTo(p.x,p.y):ctx2.lineTo(p.x,p.y);});ctx2.closePath();ctx2.fill();ctx2.stroke();}));
+        ctx2.restore();
+      }
+      // Draw raster click point
+      if(pt.lat&&pt.lng){
+        const p=this.map.latLngToContainerPoint(L.latLng(pt.lat,pt.lng));
+        ctx2.save();ctx2.beginPath();ctx2.arc(p.x,p.y,7,0,Math.PI*2);ctx2.fillStyle='rgba(0,212,255,0.9)';ctx2.fill();ctx2.strokeStyle='#fff';ctx2.lineWidth=2;ctx2.stroke();ctx2.restore();
+      }
+      mapImg=canvas.toDataURL('image/png');
+    }catch(e){}
+
+    const clipNote = this.state.rasterClipLGA ? `<span style="background:rgba(0,212,255,0.12);color:#00d4ff;border:1px solid rgba(0,212,255,0.3);border-radius:99px;padding:2px 10px;font-size:10px;font-weight:700;margin-left:8px">CLIPPED TO LGA</span>` : '';
+
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Raster Report — ${lgaName} · ${year}</title><script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"><\/script><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Segoe UI',Arial,sans-serif;background:#f8fafc;color:#1e293b;padding:24px}.page{max-width:860px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.1)}.ab{height:3px;background:linear-gradient(90deg,#00d4ff,#00e5a0,#a78bfa)}.rh{background:linear-gradient(135deg,#0a1120,#0d1f3c);padding:24px 28px;display:flex;justify-content:space-between;align-items:flex-start}.rh h1{font-size:20px;font-weight:800;color:#00d4ff}.rh p{font-size:11px;color:#7a8fa8;margin-top:3px}.rhr{text-align:right}.ln{font-size:19px;font-weight:700;color:#fff}.mt{font-size:10px;color:#7a8fa8;margin-top:4px}.bd{padding:24px 28px;display:flex;flex-direction:column;gap:20px}.st{font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;display:flex;align-items:center;gap:8px}.st::after{content:'';flex:1;height:1px;background:#e2e8f0}.rb{background:${riskColor}18;border:1px solid ${riskColor}44;border-left:4px solid ${riskColor};border-radius:8px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between}.rbig{font-size:20px;font-weight:800;color:${riskColor}}.rsub{font-size:11px;color:#64748b;margin-top:3px}.rbdg{background:${riskColor};color:#fff;padding:4px 14px;border-radius:99px;font-size:11px;font-weight:700}.pg{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.pb{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;border-left:3px solid}.pb.c4{border-left-color:#3b82f6}.pb.n2{border-left-color:#10b981}.pb.co{border-left-color:#f59e0b}.pb.is{border-left-color:#a855f7}.pl{font-size:10px;font-weight:700;color:#475569;margin-bottom:3px}.pv{font-size:15px;font-weight:700;color:#0f172a}.pu{font-size:9px;color:#94a3b8}.kg{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.kb{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px}.kl{font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px}.kv{font-size:14px;font-weight:700;color:#1e293b}.ku{font-size:9px;color:#94a3b8;margin-top:2px}.gg{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.gc{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;border-top:3px solid #e2e8f0}.gc.c4{border-top-color:#3b82f6}.gc.n2{border-top-color:#10b981}.gc.co{border-top-color:#f59e0b}.gs{font-size:13px;font-weight:800;margin-bottom:3px}.gn{font-size:9px;color:#94a3b8;text-transform:uppercase;margin-bottom:7px}.gv{font-size:14px;font-weight:700;color:#0284c7}.gu{font-size:9px;color:#94a3b8}.cw{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;height:260px;position:relative}.cg{display:grid;grid-template-columns:5fr 2fr;gap:14px;align-items:start}.bi{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;height:230px;display:flex;flex-direction:column}.bi img{flex:1;width:100%;object-fit:contain;border-radius:4px;min-height:0}.cw2{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px;height:155px;position:relative}.cl{font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}table{width:100%;border-collapse:collapse;font-size:11px}thead tr{background:#f1f5f9}th{padding:7px 10px;text-align:left;font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;border-bottom:1px solid #e2e8f0}td{padding:6px 10px;border-bottom:1px solid #f1f5f9;color:#334155;vertical-align:middle}tr:last-child td{border-bottom:none}.ft{background:#f8fafc;border-top:1px solid #e2e8f0;padding:12px 28px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8}.ac{text-align:center;padding:20px;display:flex;justify-content:center;gap:10px}@media print{body{background:#fff;padding:0}.page{box-shadow:none;border-radius:0}.ac{display:none!important}}</style></head><body><div class="page"><div class="ab"></div>
+<div class="rh"><div style="display:flex;align-items:center;gap:12px">${logoBase64?`<img src="${logoBase64}" style="width:64px;height:64px;object-fit:contain;border-radius:8px">`:''}
+<div><h1>Lagos ERM — Raster Report</h1><p>Pixel-level Emission Analysis · Sentinel-5P · Raster View${clipNote?` · Clipped to ${lgaName}`:''}</p></div></div>
+<div class="rhr"><div class="ln">${lgaName}</div><div class="mt">Year ${year} · ${date}</div></div></div>
+${mapImg?`<div style="position:relative;overflow:hidden;height:300px;border-bottom:1px solid #e2e8f0;background:#070c14"><img src="${mapImg}" style="width:100%;height:100%;object-fit:contain"><div style="position:absolute;bottom:0;left:0;right:0;padding:10px 16px;background:linear-gradient(transparent,rgba(7,12,20,0.9));display:flex;justify-content:space-between;align-items:flex-end"><span style="color:#fff;font-weight:700;font-size:14px">${lgaName}</span><span style="color:#00d4ff;font-size:11px">Raster View · ${year} · ${risk.label}</span></div></div>`:''}
+<div class="bd">
+<div><div class="st">Risk Classification</div><div class="rb"><div><div class="rbig">${risk.label}</div><div class="rsub">ISI: ${isi.toFixed(4)} · Impact Severity Index (0–1)</div></div><span class="rbdg">${risk.label}</span></div></div>
+
+<div><div class="st">Pixel Values at Click Point &nbsp;<span style="font-size:9px;color:#94a3b8;font-weight:400;text-transform:none;letter-spacing:0">${pt.lat.toFixed(5)}°N, ${pt.lng.toFixed(5)}°E</span></div>
+<div class="pg">
+  <div class="pb c4"><div class="pl">CH₄ Methane</div><div class="pv">${(pt.ch4||0).toFixed(6)}</div><div class="pu">mol/m²</div></div>
+  <div class="pb n2"><div class="pl">NO₂ Nitrogen Dioxide</div><div class="pv">${(pt.no2||0).toFixed(6)}</div><div class="pu">mol/m²</div></div>
+  <div class="pb co"><div class="pl">CO Carbon Monoxide</div><div class="pv">${(pt.co||0).toFixed(6)}</div><div class="pu">mol/m²</div></div>
+  <div class="pb is"><div class="pl">ISI Risk Score</div><div class="pv">${(pt.isi||0).toFixed(4)}</div><div class="pu">index</div></div>
+</div>
+${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #dc262644;border-left:4px solid #dc2626;border-radius:8px;padding:8px 14px;font-size:11px;color:#dc2626;font-weight:600">🔴 Hotspot signal detected at this pixel (index: ${(pt.hot||0).toFixed(2)})</div>`:''}</div>
+
+<div><div class="st">LGA Summary — ${lgaName}</div>
+<div class="kg">
+  <div class="kb"><div class="kl">CH₄ Methane</div><div class="kv">${ch4.toFixed(5)}</div><div class="ku">mol/m²</div></div>
+  <div class="kb"><div class="kl">NO₂ Nitrogen Dioxide</div><div class="kv">${no2.toFixed(5)}</div><div class="ku">mol/m²</div></div>
+  <div class="kb"><div class="kl">CO Carbon Monoxide</div><div class="kv">${co.toFixed(5)}</div><div class="ku">mol/m²</div></div>
+  <div class="kb"><div class="kl">YoY CH₄ Change</div><div class="kv" style="color:${Number(yoy)>0?'#dc2626':'#16a34a'}">${yoy!=='N/A'?(Number(yoy)>0?'+':'')+yoy+'%':'N/A'}</div><div class="ku">vs ${prevYear}</div></div>
+</div></div>
+
+<div><div class="st">Gas Trend — All 3 Gases (${years[0]}–${year})</div><div class="cw"><canvas id="rC"></canvas></div></div>
+
+<div><div class="cg">
+  ${barImg?`<div class="bi"><div class="cl">Top 10 LGAs Comparison</div><img src="${barImg}"/></div>`:'<div></div>'}
+  <div><div class="cl">Gas Composition (LGA)</div><div class="cw2"><canvas id="rD"></canvas></div></div>
+</div></div>
+
+<div><div class="st">Statewide Context &amp; Ranking</div><table><thead><tr><th>Metric</th><th>LGA Value</th><th>State Avg</th><th>Rank</th><th>Percentile</th></tr></thead><tbody>${contextRows}</tbody></table></div>
+
+<div><div class="st">Anomaly Detection</div>
+<div style="background:${anyAnomal?riskColor+'18':'rgba(22,163,74,0.08)'};border:1px solid ${anyAnomal?riskColor+'44':'rgba(22,163,74,0.3)'};border-left:4px solid ${anyAnomal?riskColor:'#16a34a'};border-radius:8px;padding:10px 14px;margin-bottom:10px">
+  <div style="font-size:13px;font-weight:700;color:${anyAnomal?riskColor:'#16a34a'}">${anyAnomal?'⚠️ Anomalous Emissions Detected':'✅ All Gases Within Normal Range'}</div>
+  <div style="font-size:10px;color:#64748b;margin-top:3px">Z-score threshold: ±1.5σ · Lagos State LGA distribution (${year})${anyAnomal?' · May indicate unauthorized dumping activity':''}</div>
+</div>
+<table><thead><tr><th>Gas</th><th>LGA Value</th><th>Mean</th><th>Std Dev</th><th>Z-Score</th><th>Flag</th></tr></thead><tbody>${anomalyTableRows}</tbody></table></div>
+
+<div><div class="st">Historical Emission Trend</div><table><thead><tr><th>Year</th><th>CH₄</th><th>NO₂</th><th>CO</th><th>ISI</th><th>Risk</th></tr></thead><tbody>${trendRows}</tbody></table></div>
+
+<div><div class="st">Buffer Analysis — Proximity to Landfills</div><table><thead><tr><th>Landfill</th><th>Distance</th><th>Buffer Zone</th><th>In LGA</th></tr></thead><tbody>${bufferTableRows}</tbody></table></div>
+
+</div><div class="ft"><span>Lagos ERM · Geoinfotech Resources Limited · Raster View</span><span>${date} · Sentinel-5P · ${year}</span></div></div>
+<div class="ac"><button onclick="window.print()" style="background:#0284c7;color:#fff;border:none;padding:10px 28px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">⬇ Download PDF</button><button onclick="window.close()" style="background:#f1f5f9;color:#334155;border:1px solid #e2e8f0;padding:10px 28px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">Close</button></div>
+<script>${chartScript}<\/script></body></html>`;
+
+    const w = window.open('','_blank','width=970,height=800,scrollbars=yes');
+    if (!w) { this.showNotification('Pop-up blocked. Allow pop-ups for this page.','info'); return; }
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    setTimeout(() => { try { w.print(); } catch(e){} }, 600);
   },
 
   async generateDrawPointReport(ctx, date, reportBasemap = null) {
@@ -3455,6 +4076,12 @@ const app = {
             </svg>
           </button>
           <div class="draw-sep"></div>
+          <button class="draw-btn" id="draw-clip-btn" title="Clip raster to selected LGA">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6,2 6,18 22,18"/><polyline points="2,6 18,6 18,22"/>
+            </svg>
+          </button>
+          <div class="draw-sep"></div>
           <button class="draw-btn" id="draw-clear-btn" title="Clear all drawings">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="3,6 5,6 21,6"/><path d="M19,6l-1,14H6L5,6m3,0V4h8v2"/>
@@ -3464,6 +4091,23 @@ const app = {
         div.querySelector('#draw-point-btn').onclick = () => appRef.activateDrawTool('marker');
         div.querySelector('#draw-line-btn').onclick  = () => appRef.activateDrawTool('polyline');
         div.querySelector('#draw-poly-btn').onclick  = () => appRef.activateDrawTool('polygon');
+        div.querySelector('#draw-clip-btn').onclick  = () => {
+          if (appRef.state.rasterClipLGA) {
+            appRef.applyRasterClip(null);
+            return;
+          }
+          const rasterActive = document.getElementById('rasterLayer')?.checked;
+          if (!rasterActive) {
+            appRef.showNotification('Switch to Raster View to use LGA clipping.', 'info');
+            return;
+          }
+          const lgaName = appRef.state.selectedFeature?.properties?.lganame;
+          if (!lgaName) {
+            appRef.showNotification('Select an LGA first using the dropdown or search bar.', 'info');
+            return;
+          }
+          appRef.applyRasterClip(lgaName);
+        };
         div.querySelector('#draw-clear-btn').onclick = () => appRef.clearDrawings();
         return div;
       },
@@ -3494,9 +4138,20 @@ const app = {
     document.querySelectorAll('.draw-btn').forEach(b => b.classList.remove('active'));
     const { layer, layerType } = e;
     this.state.drawnItems.addLayer(layer);
-    if      (layerType === 'marker')   this.analyzeDrawnPoint(layer.getLatLng(), layer);
-    else if (layerType === 'polyline') this.analyzeDrawnTransect(layer.getLatLngs(), layer);
-    else if (layerType === 'polygon')  this.analyzeDrawnZone(layer.getLatLngs()[0], layer);
+    const flattenLatLngs = (items) => {
+      if (!Array.isArray(items)) return [items];
+      return items.flatMap(item => Array.isArray(item) ? flattenLatLngs(item) : item);
+    };
+
+    if (layerType === 'marker') {
+      this.analyzeDrawnPoint(layer.getLatLng(), layer);
+    } else if (layerType === 'polyline') {
+      const latlngs = flattenLatLngs(layer.getLatLngs());
+      this.analyzeDrawnTransect(latlngs, layer);
+    } else if (layerType === 'polygon') {
+      const latlngs = flattenLatLngs(layer.getLatLngs());
+      this.analyzeDrawnZone(latlngs, layer);
+    }
   },
 
   // ── Point ────────────────────────────────────────────────────
@@ -3509,14 +4164,20 @@ const app = {
 
     try {
       let vals;
+      let geeOk = false;
       if (this.state.geeMode) {
-        const resp = await fetch(
-          `${this.state.GEE_SERVER}/pixel?lat=${lat}&lng=${lng}&year=${year}`,
-          { signal: AbortSignal.timeout(15000) }
-        );
-        vals = await resp.json();
-        if (vals.error) throw new Error(vals.error);
-      } else {
+        try {
+          const resp = await fetch(
+            `${this.state.GEE_SERVER}/pixel?lat=${lat}&lng=${lng}&year=${year}`,
+            { signal: AbortSignal.timeout(8000) }
+          );
+          const data = await resp.json();
+          if (!data.error) { vals = data; geeOk = true; }
+        } catch(geeErr) {
+          // GEE unavailable or timed out — fall through to local raster
+        }
+      }
+      if (!geeOk) {
         const gr = await this.loadRaster(String(year));
         if (!gr) throw new Error('No local raster available');
         const col = Math.floor((lng - gr.xmin) / gr.pixelWidth);
@@ -3571,40 +4232,49 @@ const app = {
     const metric  = this.state.currentMetric;
     const mLabel  = { ch4:'CH₄', no2:'NO₂', co:'CO' }[metric] || metric.toUpperCase();
     const mColor  = { ch4:'#3b82f6', no2:'#10b981', co:'#f59e0b' }[metric] || '#00d4ff';
-    const samples = this.samplePolyline(latlngs, 30);
+    const samples = this.samplePolyline(latlngs, Math.max(100, latlngs.length * 10));
 
     this.showDrawResults('Emission Transect',
       `<div class="draw-loading"><span class="draw-pulse"></span>Sampling ${samples.length} points along transect…</div>`,
       true);
 
-    const results = [];
-    for (const s of samples) {
-      try {
-        let val = null;
-        if (this.state.geeMode) {
+    let results;
+    if (this.state.geeMode) {
+      // Parallel fetches — all sample requests in flight simultaneously
+      results = await Promise.all(samples.map(async s => {
+        try {
           const resp = await fetch(
             `${this.state.GEE_SERVER}/pixel?lat=${s.latlng.lat}&lng=${s.latlng.lng}&year=${year}`,
             { signal: AbortSignal.timeout(12000) }
           );
           const data = await resp.json();
-          if (!data.error) val = data[metric] ?? null;
-        } else {
-          const gr = await this.loadRaster(String(year));
-          if (gr) {
-            const bi  = this.BAND_INDEX[metric] ?? 0;
-            const col = Math.floor((s.latlng.lng - gr.xmin) / gr.pixelWidth);
-            const row = Math.floor((gr.ymax - s.latlng.lat) / gr.pixelHeight);
-            if (row >= 0 && row < gr.height && col >= 0 && col < gr.width) {
-              const raw = gr.values[bi][row][col];
-              if (raw != null && !isNaN(raw) && raw > 0)
-                val = metric === 'ch4' ? raw * this.CH4_PPB_TO_MOL : Math.max(0, raw);
-            }
+          return { distance: s.distance, value: data.error ? null : (data[metric] ?? null), latlng: s.latlng };
+        } catch(e) {
+          return { distance: s.distance, value: null, latlng: s.latlng };
+        }
+      }));
+    } else {
+      // Load raster once, then read all sample pixels synchronously
+      const gr = await this.loadRaster(String(year));
+      const bi = this.BAND_INDEX[metric] ?? 0;
+      const nodata = gr?.noDataValue;
+      results = samples.map(s => {
+        let val = null;
+        if (gr) {
+          const col = Math.floor((s.latlng.lng - gr.xmin) / gr.pixelWidth);
+          const row = Math.floor((gr.ymax - s.latlng.lat) / gr.pixelHeight);
+          if (row >= 0 && row < gr.height && col >= 0 && col < gr.width) {
+            const raw = gr.values[bi]?.[row]?.[col];
+            // Reject only true nodata (null, NaN, the georaster noDataValue, or large sentinel like -9999)
+            const isNodata = raw == null || isNaN(raw)
+              || (nodata != null && raw === nodata)
+              || raw < -9000;
+            if (!isNodata)
+              val = metric === 'ch4' ? Math.max(0, raw * this.CH4_PPB_TO_MOL) : Math.max(0, raw);
           }
         }
-        results.push({ distance: s.distance, value: val, latlng: s.latlng });
-      } catch(e) {
-        results.push({ distance: s.distance, value: null, latlng: s.latlng });
-      }
+        return { distance: s.distance, value: val, latlng: s.latlng };
+      });
     }
 
     const totalDist    = results[results.length - 1]?.distance || 0;
@@ -3628,59 +4298,64 @@ const app = {
     const canvas = document.getElementById('drawTransectChart');
     if (!canvas) return;
 
-    if (this.charts.transect) { this.charts.transect.destroy(); this.charts.transect = null; }
-    this.charts.transect = new Chart(canvas, {
-      type: 'line',
-      data: {
-        labels: results.map(r => (r.distance / 1000).toFixed(2)),
-        datasets: [{
-          label: `${mLabel} (mol/m²)`,
-          data:  results.map(r => r.value),
-          borderColor: mColor, backgroundColor: mColor + '18',
-          borderWidth: 2, pointRadius: 3, fill: true, tension: 0.3, spanGaps: true,
-        }],
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: { callbacks: {
-            title: c => `${c[0].label} km`,
-            label: c => `${mLabel}: ${c.raw != null ? c.raw.toFixed(5) : 'N/A'}`,
-          }},
+    // Defer chart creation by one frame so the browser has time to compute
+    // layout for the newly-visible wrap element (avoids 0×0 canvas dimensions).
+    requestAnimationFrame(() => {
+      if (this.charts.transect) { this.charts.transect.destroy(); this.charts.transect = null; }
+      this.charts.transect = new Chart(canvas, {
+        type: 'line',
+        data: {
+          labels: results.map(r => (r.distance / 1000).toFixed(2)),
+          datasets: [{
+            label: `${mLabel} (mol/m²)`,
+            data:  results.map(r => r.value),
+            borderColor: mColor, backgroundColor: mColor + '18',
+            borderWidth: 2, pointRadius: 3, fill: true, tension: 0.3, spanGaps: true,
+          }],
         },
-        scales: {
-          x: { title:{ display:true, text:'Distance (km)', color:'#7a8fa8', font:{size:9} },
-               ticks:{ color:'#7a8fa8', font:{size:8}, maxTicksLimit:6 }, grid:{ color:'rgba(255,255,255,0.04)' } },
-          y: { title:{ display:true, text:`${mLabel} (mol/m²)`, color:'#7a8fa8', font:{size:9} },
-               ticks:{ color:'#7a8fa8', font:{size:8} }, grid:{ color:'rgba(255,255,255,0.04)' } },
+        options: {
+          animation: false,
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: {
+              title: c => `${c[0].label} km`,
+              label: c => `${mLabel}: ${c.raw != null ? c.raw.toFixed(5) : 'N/A'}`,
+            }},
+          },
+          scales: {
+            x: { title:{ display:true, text:'Distance (km)', color:'#7a8fa8', font:{size:9} },
+                 ticks:{ color:'#7a8fa8', font:{size:8}, maxTicksLimit:6 }, grid:{ color:'rgba(255,255,255,0.04)' } },
+            y: { title:{ display:true, text:`${mLabel} (mol/m²)`, color:'#7a8fa8', font:{size:9} },
+                 ticks:{ color:'#7a8fa8', font:{size:8} }, grid:{ color:'rgba(255,255,255,0.04)' } },
+          },
         },
-      },
-    });
+      });
 
-    // ── Profile cursor: pulsing marker on the map that tracks chart hover ──
-    if (this._profileCursor) { this.map.removeLayer(this._profileCursor); this._profileCursor = null; }
-    const cursorIcon = L.divIcon({
-      className: '',
-      html: `<div style="width:14px;height:14px;border-radius:50%;background:${mColor};border:2px solid #fff;box-shadow:0 0 10px ${mColor}cc;transform:translate(-50%,-50%)"></div>`,
-      iconSize: [14, 14], iconAnchor: [7, 7],
-    });
-    const firstLL = sampleLatLngs[0] || latlngs[0];
-    this._profileCursor = L.marker([firstLL.lat, firstLL.lng], { icon: cursorIcon, interactive: false, zIndexOffset: 1000 }).addTo(this.map);
-    this._profileCursor.setOpacity(0);
-    this._profileCursorSamples = sampleLatLngs;
+      // ── Profile cursor: pulsing marker on the map that tracks chart hover ──
+      if (this._profileCursor) { this.map.removeLayer(this._profileCursor); this._profileCursor = null; }
+      const cursorIcon = L.divIcon({
+        className: '',
+        html: `<div style="width:14px;height:14px;border-radius:50%;background:${mColor};border:2px solid #fff;box-shadow:0 0 10px ${mColor}cc;transform:translate(-50%,-50%)"></div>`,
+        iconSize: [14, 14], iconAnchor: [7, 7],
+      });
+      const firstLL = sampleLatLngs[0] || latlngs[0];
+      this._profileCursor = L.marker([firstLL.lat, firstLL.lng], { icon: cursorIcon, interactive: false, zIndexOffset: 1000 }).addTo(this.map);
+      this._profileCursor.setOpacity(0);
+      this._profileCursorSamples = sampleLatLngs;
 
-    canvas.style.cursor = 'crosshair';
-    canvas.onmousemove = (evt) => {
-      if (!this.charts.transect || !this._profileCursorSamples) return;
-      const els = this.charts.transect.getElementsAtEventForMode(evt, 'index', { intersect: false }, false);
-      if (els.length) {
-        const idx = Math.min(els[0].index, this._profileCursorSamples.length - 1);
-        const ll  = this._profileCursorSamples[idx];
-        if (ll) { this._profileCursor.setLatLng(ll); this._profileCursor.setOpacity(1); }
-      }
-    };
-    canvas.onmouseleave = () => { if (this._profileCursor) this._profileCursor.setOpacity(0); };
+      canvas.style.cursor = 'crosshair';
+      canvas.onmousemove = (evt) => {
+        if (!this.charts.transect || !this._profileCursorSamples) return;
+        const els = this.charts.transect.getElementsAtEventForMode(evt, 'index', { intersect: false }, false);
+        if (els.length) {
+          const idx = Math.min(els[0].index, this._profileCursorSamples.length - 1);
+          const ll  = this._profileCursorSamples[idx];
+          if (ll) { this._profileCursor.setLatLng(ll); this._profileCursor.setOpacity(1); }
+        }
+      };
+      canvas.onmouseleave = () => { if (this._profileCursor) this._profileCursor.setOpacity(0); };
+    });
   },
 
   // ── Zone ─────────────────────────────────────────────────────
@@ -3891,11 +4566,20 @@ const app = {
   },
 
   samplePolyline(latlngs, numSamples = 20) {
-    if (latlngs.length < 2) return [{ latlng: latlngs[0], distance: 0 }];
-    numSamples = Math.max(2, numSamples);
+    // Normalize the geometry: allow a single LatLng, flat arrays, or nested arrays.
+    const flattenLatLngs = (items) => {
+      if (!Array.isArray(items)) return [items];
+      return items.flatMap(item => Array.isArray(item) ? flattenLatLngs(item) : item);
+    };
+
+    const points = flattenLatLngs(latlngs);
+    if (points.length === 0) return [];
+    if (points.length === 1) return [{ latlng: points[0], distance: 0 }];
+    // Scale sample count with vertex count so complex lines aren't under-sampled
+    numSamples = Math.max(numSamples, points.length * 4);
 
     if (window.turf) {
-      const line    = turf.lineString(latlngs.map(ll => [ll.lng, ll.lat]));
+      const line    = turf.lineString(points.map(ll => [ll.lng, ll.lat]));
       const totalKm = turf.length(line, { units: 'kilometers' });
       return Array.from({ length: numSamples }, (_, i) => {
         const d  = (i / (numSamples - 1)) * totalKm;
@@ -3907,9 +4591,9 @@ const app = {
     // Fallback: manual linear interpolation
     const segs = [];
     let total = 0;
-    for (let i = 0; i < latlngs.length - 1; i++) {
-      const d = latlngs[i].distanceTo(latlngs[i+1]);
-      segs.push({ len:d, from:latlngs[i], to:latlngs[i+1] });
+    for (let i = 0; i < points.length - 1; i++) {
+      const d = points[i].distanceTo(points[i+1]);
+      segs.push({ len:d, from:points[i], to:points[i+1] });
       total += d;
     }
     return Array.from({ length: numSamples }, (_, i) => {
@@ -3953,7 +4637,7 @@ const app = {
   },
 
   // Search for location
-  searchLocation() {
+  async searchLocation() {
     const searchInput = document.getElementById('locationSearch');
     const query = searchInput.value.trim().toLowerCase();
 
@@ -3995,6 +4679,10 @@ const app = {
         });
       }
       this._highlightLGA(lgaFeature.properties.lganame);
+      // In raster mode: auto-clip to the matched LGA
+      if (document.getElementById('rasterLayer')?.checked) {
+        await this.applyRasterClip(lgaFeature.properties.lganame);
+      }
       // Sync SA panel if open
       const saPanel = document.getElementById('saPanel');
       if (saPanel?.classList.contains('open')) {
