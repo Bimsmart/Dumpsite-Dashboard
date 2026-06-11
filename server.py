@@ -16,7 +16,7 @@ from flask_cors import CORS
 import ee
 
 # ── Config ────────────────────────────────────────────────
-SERVICE_ACCOUNT = 'dumpsite-dasboard@ee-bolaewenla66.iam.gserviceaccount.com'
+SERVICE_ACCOUNT = 'dumpsite-dasboard@ee-bolawenlab66.iam.gserviceaccount.com'
 ROOT     = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(ROOT, 'data')
 
@@ -49,18 +49,18 @@ init_ee()
 
 # ── Assets ────────────────────────────────────────────────
 ASSETS = {
-    'lga':       'projects/ee-bolaewenla66/assets/lagos_lga',
-    'wards':     'projects/ee-bolaewenla66/assets/ngaWards',
-    'landfills': 'projects/ee-bolaewenla66/assets/landfills',
+    'lga':       'projects/ee-bolawenlab66/assets/lagos_lga',
+    'wards':     'projects/ee-bolawenlab66/assets/ngaWards',
+    'landfills': 'projects/ee-bolawenlab66/assets/landfills',
 }
 
 IMAGE_ASSETS = {
-    'stack': os.environ.get('GEE_STACK_ASSET_TEMPLATE', 'projects/ee-bolaewenla66/assets/Lagos_Gases_{year}'),
-    'ch4': os.environ.get('GEE_CH4_ASSET_TEMPLATE', 'projects/ee-bolaewenla66/assets/CH4_{year}'),
-    'no2': os.environ.get('GEE_NO2_ASSET_TEMPLATE', 'projects/ee-bolaewenla66/assets/NO2_{year}'),
-    'co': os.environ.get('GEE_CO_ASSET_TEMPLATE', 'projects/ee-bolaewenla66/assets/CO_{year}'),
-    'isi': os.environ.get('GEE_ISI_ASSET_TEMPLATE', 'projects/ee-bolaewenla66/assets/ISI_{year}'),
-    'hotspots': os.environ.get('GEE_HOTSPOTS_ASSET_TEMPLATE', 'projects/ee-bolaewenla66/assets/Hotspots_{year}'),
+    'stack': os.environ.get('GEE_STACK_ASSET_TEMPLATE', 'projects/ee-bolawenlab66/assets/Lagos_Gases_{year}'),
+    'ch4': os.environ.get('GEE_CH4_ASSET_TEMPLATE', 'projects/ee-bolawenlab66/assets/CH4_{year}'),
+    'no2': os.environ.get('GEE_NO2_ASSET_TEMPLATE', 'projects/ee-bolawenlab66/assets/NO2_{year}'),
+    'co': os.environ.get('GEE_CO_ASSET_TEMPLATE', 'projects/ee-bolawenlab66/assets/CO_{year}'),
+    'isi': os.environ.get('GEE_ISI_ASSET_TEMPLATE', 'projects/ee-bolawenlab66/assets/ISI_{year}'),
+    'hotspots': os.environ.get('GEE_HOTSPOTS_ASSET_TEMPLATE', 'projects/ee-bolawenlab66/assets/Hotspots_{year}'),
 }
 
 START_YEAR = 2018
