@@ -183,6 +183,10 @@ const app = {
         const sel = document.getElementById('basemapSelect');
         if (sel) sel.value = targetBasemap;
       }
+      // Keep raster visibility stable while switching themes.
+      if (this.layers.raster && this.layers.raster.bringToFront) {
+        this.layers.raster.bringToFront();
+      }
     }
 
     // No stroke on donut chart in light theme
@@ -4355,37 +4359,50 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
 
     // Defer chart creation by one frame so the browser has time to compute
     // layout for the newly-visible wrap element (avoids 0×0 canvas dimensions).
-    requestAnimationFrame(() => {
-      if (this.charts.transect) { this.charts.transect.destroy(); this.charts.transect = null; }
-      this.charts.transect = new Chart(canvas, {
-        type: 'line',
-        data: {
-          labels: results.map(r => (r.distance / 1000).toFixed(2)),
-          datasets: [{
-            label: `${mLabel} (mol/m²)`,
-            data:  results.map(r => r.value),
-            borderColor: mColor, backgroundColor: mColor + '18',
-            borderWidth: 2, pointRadius: 3, fill: true, tension: 0.3, spanGaps: true,
-          }],
-        },
-        options: {
-          animation: false,
-          responsive: true, maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false },
-            tooltip: { callbacks: {
-              title: c => `${c[0].label} km`,
-              label: c => `${mLabel}: ${c.raw != null ? c.raw.toFixed(5) : 'N/A'}`,
-            }},
+    const renderTransectChart = () => {
+      if (!canvas) return;
+      if (canvas.clientWidth === 0 || canvas.clientHeight === 0) {
+        return setTimeout(renderTransectChart, 50);
+      }
+      try {
+        if (this.charts.transect) { this.charts.transect.destroy(); this.charts.transect = null; }
+        this.charts.transect = new Chart(canvas, {
+          type: 'line',
+          data: {
+            labels: results.map(r => (r.distance / 1000).toFixed(2)),
+            datasets: [{
+              label: `${mLabel} (mol/m²)`,
+              data:  results.map(r => r.value),
+              borderColor: mColor, backgroundColor: mColor + '18',
+              borderWidth: 2, pointRadius: 3, fill: true, tension: 0.3, spanGaps: true,
+            }],
           },
-          scales: {
-            x: { title:{ display:true, text:'Distance (km)', color:'#7a8fa8', font:{size:9} },
-                 ticks:{ color:'#7a8fa8', font:{size:8}, maxTicksLimit:6 }, grid:{ color:'rgba(255,255,255,0.04)' } },
-            y: { title:{ display:true, text:`${mLabel} (mol/m²)`, color:'#7a8fa8', font:{size:9} },
-                 ticks:{ color:'#7a8fa8', font:{size:8} }, grid:{ color:'rgba(255,255,255,0.04)' } },
+          options: {
+            animation: false,
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: { callbacks: {
+                title: c => `${c[0].label} km`,
+                label: c => `${mLabel}: ${c.raw != null ? c.raw.toFixed(5) : 'N/A'}`,
+              }},
+            },
+            scales: {
+              x: { title:{ display:true, text:'Distance (km)', color:'#7a8fa8', font:{size:9} },
+                   ticks:{ color:'#7a8fa8', font:{size:8}, maxTicksLimit:6 }, grid:{ color:'rgba(255,255,255,0.04)' } },
+              y: { title:{ display:true, text:`${mLabel} (mol/m²)`, color:'#7a8fa8', font:{size:9} },
+                   ticks:{ color:'#7a8fa8', font:{size:8} }, grid:{ color:'rgba(255,255,255,0.04)' } },
+            },
           },
-        },
-      });
+        });
+      } catch (chartErr) {
+        console.error('Transect chart failed to render:', chartErr);
+        const resultContent = document.getElementById('drawResultsContent');
+        if (resultContent) {
+          resultContent.innerHTML += `<div style="color:var(--red);font-size:11px;padding:6px 0">Transect chart failed to render: ${chartErr.message}</div>`;
+        }
+        return;
+      }
 
       // ── Profile cursor: pulsing marker on the map that tracks chart hover ──
       if (this._profileCursor) { this.map.removeLayer(this._profileCursor); this._profileCursor = null; }
@@ -4410,7 +4427,11 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
         }
       };
       canvas.onmouseleave = () => { if (this._profileCursor) this._profileCursor.setOpacity(0); };
-    });
+    };
+    // Use setTimeout instead of rAF: rAF fires before the browser reflows the
+    // newly-shown drawTransectWrap, causing clientHeight to read as 0 and the
+    // dimension-check loop inside renderTransectChart to spin forever.
+    setTimeout(renderTransectChart, 0);
   },
 
   // ── Zone ─────────────────────────────────────────────────────

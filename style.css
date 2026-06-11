@@ -1100,6 +1100,12 @@ html, body { height:100%; font-family:'Inter',sans-serif; background:var(--bg); 
 }
 .theme-btn svg { display: block; flex-shrink: 0; }
 
+/* Light theme: logo needs a dark backing so it remains visible on white sidebar */
+[data-theme="light"] .brand-icon {
+  background: linear-gradient(135deg, #0a1120, #0d1f3c);
+  border-radius: 10px;
+  padding: 4px;
+}
 /* Light theme: fix Leaflet map tip */
 [data-theme="light"] .map-tip {
   background: rgba(255,255,255,0.92);
