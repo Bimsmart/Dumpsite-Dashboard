@@ -131,10 +131,13 @@ def mask_to_aoi(img, geometry=None):
 def format_image_asset(template, metric, year):
     return template.format(year=year, metric=metric, metric_upper=metric.upper())
 
+# Band order in the multiband Lagos_Gases stack (matches local GeoTIFF layout)
+STACK_BAND_INDEX = {'ch4': 0, 'no2': 1, 'co': 2, 'isi': 3, 'hotspots': 4}
+
 def get_asset_image(metric, year, asset_key=None):
-    key = asset_key or metric
+    key = asset_key or 'stack'
     if key not in IMAGE_ASSETS:
-        raise ValueError(f'Unknown image asset key: {key}')
+        key = 'stack'  # always fall back to the multiband stack
 
     asset_id = format_image_asset(IMAGE_ASSETS[key], metric, year)
     img = ee.Image(asset_id)
@@ -142,18 +145,19 @@ def get_asset_image(metric, year, asset_key=None):
     if key == 'stack':
         band_names = img.bandNames()
         preferred = {
-            'ch4': ['ch4', 'CH4', 'CH4_column_volume_mixing_ratio_dry_air'],
-            'no2': ['no2', 'NO2', 'tropospheric_NO2_column_number_density'],
-            'co': ['co', 'CO', 'CO_column_number_density'],
-            'isi': ['isi', 'ISI'],
+            'ch4':      ['ch4', 'CH4', 'CH4_column_volume_mixing_ratio_dry_air'],
+            'no2':      ['no2', 'NO2', 'tropospheric_NO2_column_number_density'],
+            'co':       ['co', 'CO', 'CO_column_number_density'],
+            'isi':      ['isi', 'ISI'],
             'hotspots': ['hotspots', 'Hotspots', 'HOTSPOTS'],
         }.get(metric, [metric])
 
-        selected = ee.String(band_names.get(0))
+        # Fallback: select by position (b1…b5) when bands are unnamed
+        band_idx = STACK_BAND_INDEX.get(metric, 0)
+        selected = ee.String(band_names.get(band_idx))
         for band in reversed(preferred):
             selected = ee.Algorithms.If(band_names.contains(band), band, selected)
-        selected = ee.String(selected)
-        img = img.select(selected).rename(metric)
+        img = img.select(ee.String(selected)).rename(metric)
     else:
         img = img.select(0).rename(metric)
 
@@ -286,7 +290,9 @@ def get_tiles(metric, year):
 # ── LGA stats — mirrors processRegion(lga) ───────────────
 @app.route('/asset-tiles/<metric>/<int:year>')
 def get_asset_tiles(metric, year):
-    asset_key = request.args.get('asset', metric)
+    # Default to 'stack' — only Lagos_Gases_{year} multiband assets were ingested;
+    # individual CH4/NO2/CO/ISI assets do not exist.
+    asset_key = request.args.get('asset', 'stack')
     key = f'{CACHE_VERSION}_asset_{asset_key}_{metric}_{year}'
     if key in _cache:
         return jsonify({'url': _cache[key], 'cached': True, 'asset': asset_key})
