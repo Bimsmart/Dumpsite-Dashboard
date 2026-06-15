@@ -17,6 +17,7 @@ const app = {
       emissionPoints: null,
       landfills: null,
       lgasBoundary: null,
+      places: null,
     },
     selectedFeature: null,
     selectedLayer: null,
@@ -61,6 +62,7 @@ const app = {
     lagosStateBoundary: null,
     lgaHighlight: null,
     geeHotspots: null,
+    places: null,
   },
 
   // Cache of pre-rendered imageOverlay objects keyed by "year_metric[_clipLGA]".
@@ -284,10 +286,11 @@ const app = {
   // Load GeoJSON data
   async loadData() {
     try {
-      const [lgasBoundaryResponse, lgasEmissionsResponse, landfillsResponse] = await Promise.all([
+      const [lgasBoundaryResponse, lgasEmissionsResponse, landfillsResponse, placesResponse] = await Promise.all([
         fetch('data/lga_boundary.geojson'),
         fetch('data/lga_emissions.geojson'),
         fetch('data/landfills.geojson'),
+        fetch('data/places.geojson'),
       ]);
 
       this.state.data.lgasBoundary = await lgasBoundaryResponse.json();
@@ -295,6 +298,7 @@ const app = {
       const landfillsData = await landfillsResponse.json();
       this.state.data.emissionPoints = landfillsData;
       this.state.data.landfills = landfillsData;
+      this.state.data.places = await placesResponse.json();
 
       // Populate LGA selector
       this.populateLGASelector();
@@ -341,6 +345,7 @@ const app = {
     this.addLGALayer();
     this.addEmissionPointsLayer();
     this.addLandfillsLayer();
+    this.addPlacesLayer();
 
     // Add layer control
     this.map.on('click', () => {
@@ -398,9 +403,20 @@ const app = {
     this.layers.basemap = L.tileLayer(tileUrl, {
       attribution: attribution,
       maxZoom: 19,
+      zIndex: 1,
     }).addTo(this.map);
 
     this.state.currentBasemap = type;
+
+    // Ensure the raster layer stays above the basemap after the swap.
+    // imageOverlay uses bringToFront(); tileLayer (GEE mode) uses setZIndex().
+    if (this.layers.raster) {
+      if (typeof this.layers.raster.setZIndex === 'function') {
+        this.layers.raster.setZIndex(2);
+      } else if (typeof this.layers.raster.bringToFront === 'function') {
+        this.layers.raster.bringToFront();
+      }
+    }
   },
 
   // Add LGA boundaries layer
@@ -614,6 +630,44 @@ const app = {
     });
 
     this.layers.hotspots.addTo(this.map);
+  },
+
+  // Add Places layer (settlements/towns from OSM)
+  addPlacesLayer() {
+    if (this.layers.places) {
+      this.map.removeLayer(this.layers.places);
+    }
+    if (!this.state.data.places) return;
+
+    this.layers.places = L.geoJSON(this.state.data.places, {
+      pointToLayer: (feature, latlng) => {
+        return L.circleMarker(latlng, {
+          radius: 2,
+          fillColor: '#f0abfc',
+          color: '#a21caf',
+          weight: 1,
+          opacity: 0.9,
+          fillOpacity: 0.8,
+        });
+      },
+      onEachFeature: (feature, layer) => {
+        const name = feature.properties.name || '';
+        const fclass = feature.properties.fclass || '';
+        if (name) {
+          layer.bindTooltip(name, {
+            permanent: true,
+            direction: 'right',
+            offset: [4, 0],
+            className: 'places-label',
+          });
+        }
+        layer.bindPopup(`<strong>${name || 'Unnamed'}</strong><br/><em>${fclass}</em>`);
+      },
+    });
+
+    if (document.getElementById('placesLayer')?.checked) {
+      this.layers.places.addTo(this.map);
+    }
   },
 
   // Add Heatmap layer
@@ -1279,6 +1333,18 @@ const app = {
       }
     });
 
+    document.getElementById('placesLayer')?.addEventListener('change', (e) => {
+      if (e.target.checked) {
+        if (this.layers.places && !this.map.hasLayer(this.layers.places)) {
+          this.map.addLayer(this.layers.places);
+        }
+      } else {
+        if (this.layers.places && this.map.hasLayer(this.layers.places)) {
+          this.map.removeLayer(this.layers.places);
+        }
+      }
+    });
+
     document.getElementById('rasterLayer')?.addEventListener('change', async (e) => {
       if (e.target.checked) {
         // Turn off LGA Emissions when Emission Surface is switched on
@@ -1356,11 +1422,9 @@ const app = {
               }
             });
           }
-          // In raster mode: fit bounds and auto-clip to the selected LGA
+          // In raster mode: clip mask only — no raster re-render
           if (document.getElementById('rasterLayer')?.checked) {
-            const boundary = this.state.data.lgasBoundary?.features?.find(f => f.properties.lganame === e.target.value);
-            if (boundary) this.map.fitBounds(L.geoJSON(boundary).getBounds(), { padding:[40,40] });
-            await this.applyRasterClip(e.target.value);
+            this._applyVisualClip(e.target.value);
           }
           this.state.selectedFeature = feature;
           this.updateAnalyticsPanel();
@@ -1373,9 +1437,9 @@ const app = {
           }
         }
       } else {
-        // "All LGAs" selected — reset raster clip
+        // "All LGAs" selected — remove clip mask, no re-render
         if (document.getElementById('rasterLayer')?.checked) {
-          await this.applyRasterClip(null);
+          this._applyVisualClip(null);
         }
       }
     });
@@ -1894,6 +1958,7 @@ const app = {
     this.state.selectedFeature = feature;
     this.updateAnalyticsPanel();
     this._highlightLGA(lgaName);
+    if (document.getElementById('rasterLayer')?.checked) this._applyVisualClip(lgaName);
   },
 
 
@@ -2346,6 +2411,29 @@ const app = {
     }
   },
 
+  // Apply clip mask visually without re-rendering the raster overlay.
+  // Used when LGA is selected/searched so the raster image is preserved and
+  // only the mask layer swaps.  Full re-render (applyRasterClip) is reserved
+  // for the explicit clip button and metric/year changes.
+  _applyVisualClip(lgaName) {
+    const oldClip = this.state.rasterClipLGA;
+    if (oldClip !== (lgaName || null)) {
+      if (oldClip) {
+        Object.keys(this._overlayCache).forEach(k => {
+          if (k.endsWith('_' + oldClip)) delete this._overlayCache[k];
+        });
+      } else {
+        Object.keys(this._overlayCache).forEach(k => {
+          if (!k.slice(k.indexOf('_') + 1).includes('_')) delete this._overlayCache[k];
+        });
+      }
+    }
+    this.state.rasterClipLGA = lgaName || null;
+    this._updateClipButton();
+    this._removeClipMask();
+    if (lgaName) this._addClipMask(lgaName);
+  },
+
   _updateClipButton() {
     const btn = document.getElementById('draw-clip-btn');
     if (!btn) return;
@@ -2608,7 +2696,8 @@ const app = {
       const tileURL = await this.getGEETileURL(metric, year);
       this.layers.raster = L.tileLayer(tileURL, {
         opacity: 0.75,
-        attribution: 'Google Earth Engine · Sentinel-5P'
+        attribution: 'Google Earth Engine · Sentinel-5P',
+        zIndex: 2,
       });
       if (document.getElementById('rasterLayer')?.checked) {
         this.layers.raster.once('load', onRasterLoad);
@@ -4292,7 +4381,7 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
     const metric  = this.state.currentMetric;
     const mLabel  = { ch4:'CH₄', no2:'NO₂', co:'CO' }[metric] || metric.toUpperCase();
     const mColor  = { ch4:'#3b82f6', no2:'#10b981', co:'#f59e0b' }[metric] || '#00d4ff';
-    const samples = this.samplePolyline(latlngs, Math.max(100, latlngs.length * 10));
+    const samples = this.samplePolyline(latlngs, 30);
 
     this.showDrawResults('Emission Transect',
       `<div class="draw-loading"><span class="draw-pulse"></span>Sampling ${samples.length} points along transect…</div>`,
@@ -4652,8 +4741,6 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
     const points = flattenLatLngs(latlngs);
     if (points.length === 0) return [];
     if (points.length === 1) return [{ latlng: points[0], distance: 0 }];
-    // Scale sample count with vertex count so complex lines aren't under-sampled
-    numSamples = Math.max(numSamples, points.length * 4);
 
     if (window.turf) {
       const line    = turf.lineString(points.map(ll => [ll.lng, ll.lat]));
@@ -4756,9 +4843,9 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
         });
       }
       this._highlightLGA(lgaFeature.properties.lganame);
-      // In raster mode: auto-clip to the matched LGA
+      // In raster mode: clip mask only — no raster re-render
       if (document.getElementById('rasterLayer')?.checked) {
-        await this.applyRasterClip(lgaFeature.properties.lganame);
+        this._applyVisualClip(lgaFeature.properties.lganame);
       }
       // Sync SA panel if open
       const saPanel = document.getElementById('saPanel');

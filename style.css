@@ -184,17 +184,17 @@ html, body { height:100%; font-family:'Inter',sans-serif; background:var(--bg); 
 .map-wrap { flex:1; position:relative; overflow:hidden; }
 #map { width:100%; height:100%; }
 
-.map-legend { position:absolute; bottom:16px; left:16px; background:var(--map-legend-bg); backdrop-filter:blur(12px); border:1px solid rgba(0,212,255,.14); border-radius:var(--r-lg); padding:10px; z-index:400; max-width:190px; box-shadow:var(--sh-lg); max-height:200px; overflow-y:auto; }
-.map-legend strong { display:block; font-family:'Space Grotesk',sans-serif; font-size:10px; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:.7px; margin-bottom:7px; padding-bottom:6px; border-bottom:1px solid var(--border); }
-#legendContent { display:flex; flex-direction:column; gap:6px; }
-.legend-section { display:flex; flex-direction:column; gap:5px; }
-.legend-section-title { font-size:9px; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:0.8px; }
-.legend-item { display:grid; grid-template-columns:14px 1fr; gap:6px; align-items:center; padding:2px 0; }
-.legend-color { width:14px; height:14px; border-radius:3px; border:1px solid rgba(255,255,255,.08); }
-.legend-gradient { width:100%; height:10px; border-radius:999px; border:1px solid rgba(255,255,255,.08); }
-.legend-gradient-labels { display:flex; justify-content:space-between; gap:8px; margin-top:4px; font-size:9px; color:var(--t2); }
-.legend-label { font-size:9px; font-weight:700; color:var(--t1); text-transform:uppercase; }
-.legend-range,.legend-desc { font-size:8px; color:var(--t2); }
+.map-legend { position:absolute; bottom:16px; left:16px; background:var(--map-legend-bg); backdrop-filter:blur(12px); border:1px solid rgba(0,212,255,.14); border-radius:var(--r-lg); padding:14px; z-index:400; max-width:240px; box-shadow:var(--sh-lg); max-height:300px; overflow-y:auto; }
+.map-legend strong { display:block; font-family:'Space Grotesk',sans-serif; font-size:12px; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:.7px; margin-bottom:9px; padding-bottom:7px; border-bottom:1px solid var(--border); }
+#legendContent { display:flex; flex-direction:column; gap:8px; }
+.legend-section { display:flex; flex-direction:column; gap:6px; }
+.legend-section-title { font-size:10px; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:0.8px; }
+.legend-item { display:grid; grid-template-columns:16px 1fr; gap:8px; align-items:center; padding:3px 0; }
+.legend-color { width:16px; height:16px; border-radius:3px; border:1px solid rgba(255,255,255,.08); }
+.legend-gradient { width:100%; height:12px; border-radius:999px; border:1px solid rgba(255,255,255,.08); }
+.legend-gradient-labels { display:flex; justify-content:space-between; gap:8px; margin-top:5px; font-size:10px; color:var(--t2); }
+.legend-label { font-size:10px; font-weight:700; color:var(--t1); text-transform:uppercase; }
+.legend-range,.legend-desc { font-size:9px; color:var(--t2); }
 
 .draw-results-table { width:100%; border-collapse:collapse; background:var(--surface-2); border:1px solid var(--border); border-radius:10px; overflow:hidden; }
 .draw-results-table th, .draw-results-table td { padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.06); color:var(--t1); }
@@ -265,6 +265,8 @@ html, body { height:100%; font-family:'Inter',sans-serif; background:var(--bg); 
 .leaflet-popup-content-wrapper { background:var(--surface) !important; border:1px solid var(--border) !important; border-radius:var(--r-md) !important; box-shadow:var(--sh-lg) !important; color:var(--t1) !important; }
 .leaflet-popup-tip { background:var(--surface) !important; }
 .leaflet-popup-content { margin:10px 14px; font-size:12px; color:var(--t1); }
+.places-label { background:transparent !important; border:none !important; box-shadow:none !important; font-size:9px !important; font-weight:500 !important; color:#f5f5f0 !important; text-shadow:0 1px 2px rgba(0,0,0,0.8) !important; white-space:nowrap !important; }
+.places-label::before { display:none !important; }
 .leaflet-bar a { background:var(--surface) !important; border-color:var(--border) !important; color:var(--t1) !important; }
 .leaflet-bar a:hover { background:var(--surface-2) !important; color:var(--accent) !important; }
 
