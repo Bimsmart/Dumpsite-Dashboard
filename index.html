@@ -47,9 +47,14 @@
             <div id="sidebarRole" style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.6px"></div>
           </div>
         </div>
-        <button onclick="app.logout()" title="Sign out" style="background:none;border:none;cursor:pointer;padding:4px;color:var(--t3);flex-shrink:0">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-        </button>
+        <div style="display:flex;align-items:center;gap:2px;flex-shrink:0">
+          <button onclick="app.openChangePasswordModal()" title="Change password" style="background:none;border:none;cursor:pointer;padding:4px;color:var(--t3)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="5.5"/><path d="M11 11.5V8a5 5 0 0 1 10 0v3"/><rect x="14" y="11" width="7" height="10" rx="1"/><line x1="17.5" y1="16" x2="17.5" y2="18"/></svg>
+          </button>
+          <button onclick="app.logout()" title="Sign out" style="background:none;border:none;cursor:pointer;padding:4px;color:var(--t3)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -877,6 +882,45 @@
         style="width:100%;background:linear-gradient(135deg,#0284c7,#0ea5e9);color:#fff;border:none;border-radius:8px;padding:11px;font-size:13px;font-weight:600;cursor:pointer;letter-spacing:.3px">
         Sign In
       </button>
+    </form>
+  </div>
+</div>
+
+<!-- ── CHANGE PASSWORD MODAL ── -->
+<div id="changePwOverlay" style="display:none;position:fixed;inset:0;background:rgba(7,12,20,0.85);z-index:99998;align-items:center;justify-content:center">
+  <div style="background:var(--surface,#111827);border:1px solid rgba(0,212,255,0.2);border-radius:16px;padding:30px 36px;width:320px;max-width:92vw;box-shadow:0 24px 80px rgba(0,0,0,0.6)">
+    <div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;color:var(--t1);margin-bottom:20px;display:flex;align-items:center;gap:8px">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00d4ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      Change Password
+    </div>
+    <form id="changePwForm" onsubmit="app.changePassword(event)">
+      <div style="margin-bottom:10px">
+        <label style="font-size:10px;font-weight:600;color:#7a8fa8;text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:5px">Current Password</label>
+        <input id="changePwCurrent" type="password" autocomplete="current-password" placeholder="Enter current password"
+          style="width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:9px 12px;color:var(--t1,#e2e8f0);font-size:13px;outline:none;box-sizing:border-box">
+      </div>
+      <div style="margin-bottom:10px">
+        <label style="font-size:10px;font-weight:600;color:#7a8fa8;text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:5px">New Password</label>
+        <input id="changePwNew" type="password" autocomplete="new-password" placeholder="Min 6 characters"
+          style="width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:9px 12px;color:var(--t1,#e2e8f0);font-size:13px;outline:none;box-sizing:border-box">
+      </div>
+      <div style="margin-bottom:16px">
+        <label style="font-size:10px;font-weight:600;color:#7a8fa8;text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:5px">Confirm New Password</label>
+        <input id="changePwConfirm" type="password" autocomplete="new-password" placeholder="Repeat new password"
+          style="width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:9px 12px;color:var(--t1,#e2e8f0);font-size:13px;outline:none;box-sizing:border-box">
+      </div>
+      <div id="changePwError" style="display:none;color:#ef4444;font-size:11px;text-align:center;margin-bottom:10px;padding:6px;background:rgba(239,68,68,0.1);border-radius:6px"></div>
+      <div id="changePwSuccess" style="display:none;color:#22c55e;font-size:11px;text-align:center;margin-bottom:10px;padding:6px;background:rgba(34,197,94,0.1);border-radius:6px"></div>
+      <div style="display:flex;gap:8px">
+        <button type="button" onclick="app.closeChangePasswordModal()"
+          style="flex:1;background:rgba(255,255,255,0.06);color:var(--t2);border:1px solid var(--border);border-radius:8px;padding:9px;font-size:12px;cursor:pointer">
+          Cancel
+        </button>
+        <button type="submit" id="changePwBtn"
+          style="flex:1;background:linear-gradient(135deg,#0284c7,#0ea5e9);color:#fff;border:none;border-radius:8px;padding:9px;font-size:12px;font-weight:600;cursor:pointer">
+          Update
+        </button>
+      </div>
     </form>
   </div>
 </div>

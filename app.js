@@ -5022,6 +5022,73 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
     this.showLoginModal();
   },
 
+  // ── Change password ──────────────────────────────────────────────────────────
+
+  openChangePasswordModal() {
+    const el = document.getElementById('changePwOverlay');
+    if (!el) return;
+    document.getElementById('changePwCurrent').value  = '';
+    document.getElementById('changePwNew').value      = '';
+    document.getElementById('changePwConfirm').value  = '';
+    document.getElementById('changePwError').style.display   = 'none';
+    document.getElementById('changePwSuccess').style.display = 'none';
+    document.getElementById('changePwBtn').textContent = 'Update';
+    document.getElementById('changePwBtn').disabled   = false;
+    el.style.display = 'flex';
+    setTimeout(() => document.getElementById('changePwCurrent')?.focus(), 100);
+  },
+
+  closeChangePasswordModal() {
+    const el = document.getElementById('changePwOverlay');
+    if (el) el.style.display = 'none';
+  },
+
+  async changePassword(e) {
+    e.preventDefault();
+    const current  = document.getElementById('changePwCurrent').value;
+    const newPw    = document.getElementById('changePwNew').value;
+    const confirm  = document.getElementById('changePwConfirm').value;
+    const errEl    = document.getElementById('changePwError');
+    const okEl     = document.getElementById('changePwSuccess');
+    const btn      = document.getElementById('changePwBtn');
+
+    errEl.style.display = 'none';
+    okEl.style.display  = 'none';
+
+    if (!current || !newPw || !confirm) {
+      errEl.textContent = 'All fields are required.'; errEl.style.display = 'block'; return;
+    }
+    if (newPw.length < 6) {
+      errEl.textContent = 'New password must be at least 6 characters.'; errEl.style.display = 'block'; return;
+    }
+    if (newPw !== confirm) {
+      errEl.textContent = 'New passwords do not match.'; errEl.style.display = 'block'; return;
+    }
+
+    btn.textContent = 'Updating…'; btn.disabled = true;
+    try {
+      const r = await fetch(`${this.state.BACKEND_URL}/api/auth/change-password`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.state.authToken}` },
+        body: JSON.stringify({ current_password: current, new_password: newPw }),
+      });
+      const data = await r.json();
+      if (!r.ok) {
+        errEl.textContent = data.error || 'Failed to update password.';
+        errEl.style.display = 'block';
+        btn.textContent = 'Update'; btn.disabled = false; return;
+      }
+      okEl.textContent = 'Password updated successfully.';
+      okEl.style.display = 'block';
+      btn.textContent = 'Update'; btn.disabled = false;
+      setTimeout(() => this.closeChangePasswordModal(), 1800);
+    } catch (err) {
+      errEl.textContent = 'Connection error.';
+      errEl.style.display = 'block';
+      btn.textContent = 'Update'; btn.disabled = false;
+    }
+  },
+
   // ── Admin panel ─────────────────────────────────────────────────────────────
 
   openAdminPanel() {

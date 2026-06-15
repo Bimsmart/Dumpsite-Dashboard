@@ -506,6 +506,27 @@ def delete_user(uid):
     db.close()
     return jsonify({'success': True})
 
+@app.route('/api/auth/change-password', methods=['PUT'])
+@require_auth
+def change_own_password():
+    data         = request.get_json() or {}
+    current_pass = data.get('current_password') or ''
+    new_pass     = data.get('new_password') or ''
+    if not current_pass or not new_pass:
+        return jsonify({'error': 'current_password and new_password are required'}), 400
+    if len(new_pass) < 6:
+        return jsonify({'error': 'New password must be at least 6 characters'}), 400
+    db   = get_db()
+    user = db.execute("SELECT id, password_hash FROM users WHERE username=?", (g.user['u'],)).fetchone()
+    if not user or not check_password_hash(user['password_hash'], current_pass):
+        db.close()
+        return jsonify({'error': 'Current password is incorrect'}), 403
+    db.execute("UPDATE users SET password_hash=? WHERE id=?",
+               (generate_password_hash(new_pass), user['id']))
+    db.commit()
+    db.close()
+    return jsonify({'success': True})
+
 @app.route('/api/admin/users/<int:uid>/password', methods=['PUT'])
 @require_admin
 def change_password(uid):
