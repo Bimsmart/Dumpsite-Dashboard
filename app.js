@@ -3667,9 +3667,19 @@ const app = {
     win.document.close();
   },
 
-  buildReportPage(title, subtitle, bodyHtml, scripts = '') {
+  async _loadLogoBase64() {
+    try {
+      const r = await fetch('logo.png');
+      if (!r.ok) return '';
+      const blob = await r.blob();
+      return await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(blob); });
+    } catch(e) { return ''; }
+  },
+
+  buildReportPage(title, subtitle, bodyHtml, scripts = '', logoBase64 = '') {
     const safeFile = JSON.stringify((title||'report').replace(/\s+/g,'_').replace(/[^a-z0-9_]/gi,'')+'_report.html');
-    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${title}</title><script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Segoe UI',Arial,sans-serif;background:#f8fafc;color:#1e293b;padding:24px}.page{max-width:820px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.1)}.ab{height:3px;background:linear-gradient(90deg,#00d4ff,#00e5a0,#a78bfa)}.rh{background:linear-gradient(135deg,#0a1120,#0d1f3c);padding:24px 28px;display:flex;justify-content:space-between;align-items:flex-start}.rh h1{font-size:20px;font-weight:800;color:#00d4ff}.rh p{font-size:11px;color:#7a8fa8;margin-top:3px;max-width:540px}.rhr{text-align:right}.ln{font-size:19px;font-weight:700;color:#fff}.mt{font-size:10px;color:#7a8fa8;margin-top:4px}.bd{padding:24px 28px;display:flex;flex-direction:column;gap:20px}.rb{background:rgba(22,163,74,0.12);border:1px solid rgba(22,163,74,0.3);border-left:4px solid #16a34a;border-radius:8px;padding:14px 18px;display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap}.rbdg{background:#16a34a;color:#fff;padding:4px 14px;border-radius:999px;font-size:11px;font-weight:700;text-transform:uppercase}.kg{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}.kb{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px}.kl{font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}.kv{font-size:18px;font-weight:700;color:#0f172a}.ku{font-size:11px;color:#64748b;margin-top:6px}.chart-wrap{margin-top:18px;padding:18px;background:#fff;border:1px solid #e2e8f0;border-radius:12px}.report-map{margin-top:18px}.report-map img{width:100%;border-radius:12px;border:1px solid #e2e8f0}.note{margin-top:16px;font-size:13px;color:#475569;line-height:1.6}table{width:100%;border-collapse:collapse;margin-top:12px}td,th{padding:12px;border:1px solid #e2e8f0;font-size:13px}th{background:#eff6ff;text-align:left;color:#0f172a}.ac{text-align:center;padding:20px;display:flex;justify-content:center;gap:10px}@media print{.ac{display:none!important}}</style></head><body><div class="page"><div class="ab"></div><div class="rh"><div><h1>${title}</h1><p>${subtitle}</p></div><div class="rhr"><div class="ln">Report</div></div></div><div class="bd">${bodyHtml}</div></div><div class="ac"><button onclick="_dlHTML()" style="background:#0f766e;color:#fff;border:none;padding:10px 28px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">&#8659; Download HTML</button><button onclick="window.print()" style="background:#0284c7;color:#fff;border:none;padding:10px 28px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">&#8659; Save as PDF</button><button onclick="window.close()" style="background:#f1f5f9;color:#334155;border:1px solid #e2e8f0;padding:10px 28px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">Close</button></div>${scripts}<script>function _dlHTML(){var b=new Blob([document.documentElement.outerHTML],{type:'text/html;charset=utf-8'});var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=${safeFile};document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},500)}<\/script></body></html>`;
+    const logoHtml = logoBase64 ? `<img src="${logoBase64}" style="width:56px;height:56px;object-fit:contain;border-radius:8px;flex-shrink:0">` : '';
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${title}</title><script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Segoe UI',Arial,sans-serif;background:#f8fafc;color:#1e293b;padding:24px}.page{max-width:820px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.1)}.ab{height:3px;background:linear-gradient(90deg,#00d4ff,#00e5a0,#a78bfa)}.rh{background:linear-gradient(135deg,#0a1120,#0d1f3c);padding:24px 28px;display:flex;justify-content:space-between;align-items:flex-start}.rh h1{font-size:20px;font-weight:800;color:#00d4ff}.rh p{font-size:11px;color:#7a8fa8;margin-top:3px;max-width:540px}.rhr{text-align:right}.ln{font-size:19px;font-weight:700;color:#fff}.mt{font-size:10px;color:#7a8fa8;margin-top:4px}.bd{padding:24px 28px;display:flex;flex-direction:column;gap:20px}.rb{background:rgba(22,163,74,0.12);border:1px solid rgba(22,163,74,0.3);border-left:4px solid #16a34a;border-radius:8px;padding:14px 18px;display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap}.rbdg{background:#16a34a;color:#fff;padding:4px 14px;border-radius:999px;font-size:11px;font-weight:700;text-transform:uppercase}.kg{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}.kb{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px}.kl{font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}.kv{font-size:18px;font-weight:700;color:#0f172a}.ku{font-size:11px;color:#64748b;margin-top:6px}.chart-wrap{margin-top:18px;padding:18px;background:#fff;border:1px solid #e2e8f0;border-radius:12px}.report-map{margin-top:18px}.report-map img{width:100%;border-radius:12px;border:1px solid #e2e8f0}.note{margin-top:16px;font-size:13px;color:#475569;line-height:1.6}table{width:100%;border-collapse:collapse;margin-top:12px}td,th{padding:12px;border:1px solid #e2e8f0;font-size:13px}th{background:#eff6ff;text-align:left;color:#0f172a}.ac{text-align:center;padding:20px;display:flex;justify-content:center;gap:10px}@media print{.ac{display:none!important}}</style></head><body><div class="page"><div class="ab"></div><div class="rh"><div style="display:flex;align-items:center;gap:12px">${logoHtml}<div><h1>${title}</h1><p>${subtitle}</p></div></div><div class="rhr"><div class="ln">Report</div></div></div><div class="bd">${bodyHtml}</div></div><div class="ac"><button onclick="_dlHTML()" style="background:#0f766e;color:#fff;border:none;padding:10px 28px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">&#8659; Download HTML</button><button onclick="window.print()" style="background:#0284c7;color:#fff;border:none;padding:10px 28px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">&#8659; Save as PDF</button><button onclick="window.close()" style="background:#f1f5f9;color:#334155;border:1px solid #e2e8f0;padding:10px 28px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">Close</button></div>${scripts}<script>function _dlHTML(){var b=new Blob([document.documentElement.outerHTML],{type:'text/html;charset=utf-8'});var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=${safeFile};document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},500)}<\/script></body></html>`;
   },
 
   // ── Tile math helpers ────────────────────────────────────────
@@ -4058,9 +4068,12 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
     const riskColors = { low:'#16a34a', moderate:'#ca8a04', elevated:'#f97316', high:'#dc2626', critical:'#7c2d12' };
     const riskColor  = riskColors[ctx.risk.css] || '#888';
 
-    const mapImg = (ctx.lat != null && ctx.lng != null)
-      ? await this.captureMapWithDrawnFeature('point', { lat: ctx.lat, lng: ctx.lng }, reportBasemap)
-      : '';
+    const [logoBase64, mapImg] = await Promise.all([
+      this._loadLogoBase64(),
+      (ctx.lat != null && ctx.lng != null)
+        ? this.captureMapWithDrawnFeature('point', { lat: ctx.lat, lng: ctx.lng }, reportBasemap)
+        : Promise.resolve(''),
+    ]);
 
     const body = `
       <div class="rb" style="background:${riskColor}18;border-color:${riskColor}44;border-left-color:${riskColor}">
@@ -4081,7 +4094,7 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
         <div class="kb"><div class="kl">ISI</div><div class="kv">${ctx.vals.isi.toFixed(4)}</div><div class="ku">Index</div></div>
       </div>
     `;
-    const html = this.buildReportPage(ctx.title, `Study area: ${ctx.label} · Year: ${ctx.year} · ${date}`, body);
+    const html = this.buildReportPage(ctx.title, `Study area: ${ctx.label} · Year: ${ctx.year} · ${date}`, body, '', logoBase64);
     const win = window.open('','_blank','width=860,height=820');
     if (!win) return;
     win.document.write(html);
@@ -4100,9 +4113,12 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
     const pathLatLngs = ctx.sampleLatLngs?.length ? ctx.sampleLatLngs
                       : ctx.latlngs?.length       ? ctx.latlngs
                       : [];
-    const mapImg = pathLatLngs.length >= 2
-      ? await this.captureMapWithDrawnFeature('polyline', pathLatLngs, reportBasemap)
-      : '';
+    const [logoBase64, mapImg] = await Promise.all([
+      this._loadLogoBase64(),
+      pathLatLngs.length >= 2
+        ? this.captureMapWithDrawnFeature('polyline', pathLatLngs, reportBasemap)
+        : Promise.resolve(''),
+    ]);
 
     // Build per-sample table rows (every 5th sample to keep it readable)
     const tableRows = ctx.results
@@ -4128,7 +4144,7 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
       ${tableRows ? `<div style="margin-top:14px"><div style="font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px">Sample Values (selected)</div><table><thead><tr><th>Distance</th><th>${ctx.mLabel} (mol/m²)</th></tr></thead><tbody>${tableRows}</tbody></table></div>` : ''}
     `;
     const scripts = `<script>const ctxc=document.getElementById('transectChart').getContext('2d');new Chart(ctxc,{type:'line',data:{labels:${JSON.stringify(ctx.results.map(r=>(r.distance/1000).toFixed(2)))},datasets:[{label:'${ctx.mLabel} (mol/m²)',data:${JSON.stringify(ctx.results.map(r=>r.value))},borderColor:'${ctx.mColor}',backgroundColor:'${ctx.mColor}22',fill:true,pointRadius:2,borderWidth:2.5,tension:0.35,spanGaps:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{title:c=>\`\${c[0].label} km\`,label:c=>\`${ctx.mLabel}: \${c.raw!=null?c.raw.toFixed(6):'N/A'}\`}}},scales:{x:{title:{display:true,text:'Distance (km)',font:{size:11}},ticks:{maxTicksLimit:10}},y:{title:{display:true,text:'${ctx.mLabel} (mol/m²)',font:{size:11}},beginAtZero:false}}}});<\/script>`;
-    const html = this.buildReportPage(ctx.title, `Emission transect profile · ${ctx.mLabel} · Year: ${ctx.year} · ${date}`, body, scripts);
+    const html = this.buildReportPage(ctx.title, `Emission transect profile · ${ctx.mLabel} · Year: ${ctx.year} · ${date}`, body, scripts, logoBase64);
     const win = window.open('','_blank','width=980,height=920');
     if (!win) return;
     win.document.write(html);
@@ -4149,9 +4165,12 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
     const areaKm2 = ctx.areaKm2 != null ? ctx.areaKm2 : 'N/A';
     const source = ctx.source || 'Drawn area';
     const polyCoords = ctx.polygonCoords || ctx.drawnCoords || [];
-    const mapImg = polyCoords.length >= 3
-      ? await this.captureMapWithDrawnFeature('polygon', polyCoords, reportBasemap)
-      : '';
+    const [logoBase64, mapImg] = await Promise.all([
+      this._loadLogoBase64(),
+      polyCoords.length >= 3
+        ? this.captureMapWithDrawnFeature('polygon', polyCoords, reportBasemap)
+        : Promise.resolve(''),
+    ]);
     const detailRows = details.map(d => {
       const fmt = (v, key) => {
         if (v == null || isNaN(v)) return 'N/A';
@@ -4171,7 +4190,7 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
       <div class="note"><strong>LGAs included:</strong> ${lgas}</div>
       ${detailRows ? `<div class="note"><strong>LGA detail values:</strong></div><table><thead><tr><th>LGA</th><th>CH₄</th><th>NO₂</th><th>CO</th><th>ISI</th></tr></thead><tbody>${detailRows}</tbody></table>` : ''}
     `;
-    const html = this.buildReportPage(ctx.title, `Zone statistics · Year: ${ctx.year} · ${date}`, body);
+    const html = this.buildReportPage(ctx.title, `Zone statistics · Year: ${ctx.year} · ${date}`, body, '', logoBase64);
     const win = window.open('','_blank','width=980,height=900');
     if (!win) return;
     win.document.write(html);
