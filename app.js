@@ -4499,11 +4499,13 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
     const canvas = document.getElementById('drawTransectChart');
     if (!canvas) return;
 
-    // Defer chart creation by one frame so the browser has time to compute
-    // layout for the newly-visible wrap element (avoids 0×0 canvas dimensions).
+    // Defer chart creation until the positioned parent has layout dimensions.
+    // Check the parent div (not the canvas itself — canvas has no intrinsic size
+    // before Chart.js initialises, so clientHeight is always 0 at first).
     const renderTransectChart = () => {
       if (!canvas) return;
-      if (canvas.clientWidth === 0 || canvas.clientHeight === 0) {
+      const chartParent = canvas.parentElement;
+      if (!chartParent || chartParent.clientWidth === 0 || chartParent.clientHeight === 0) {
         return setTimeout(renderTransectChart, 50);
       }
       try {
