@@ -1,0 +1,5 @@
+flask>=2.3
+flask-cors>=4.0
+werkzeug>=2.3
+pandas>=1.5
+shapely>=2.0

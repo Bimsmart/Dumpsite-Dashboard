@@ -24,8 +24,14 @@ const app = {
     rasterData: {},
     clickedPoint: null,
     rasterClipLGA: null,  // LGA name when raster is clipped to an LGA, null = full state
-    geeMode: false,  // true when server.py is running
+    geeMode: false,
     GEE_SERVER: 'http://localhost:5001',
+    // ── Auth / backend ──────────────────────────────────────
+    backendMode: false,          // true when backend.py is reachable
+    BACKEND_URL: 'http://localhost:5002',
+    authToken: null,
+    authUsername: null,
+    authRole: null,
     geeRasterSource: 'asset',
     geeTileEndpointTemplate: null,
     theme: 'dark',
@@ -268,6 +274,12 @@ const app = {
     this.initChartDefaults();
     this.setTheme(localStorage.getItem('erm-theme') || 'dark');
     this.setAvailableYears(this.getYears());
+    // Check if backend is available; if so require login before loading data
+    const backendUp = await this.checkBackend();
+    if (backendUp) {
+      const authed = await this.restoreSession();
+      if (!authed) { this.showLoginModal(); return; }
+    }
     await this.loadData();
     this.initializeMap();
     this.attachEventListeners();
@@ -283,29 +295,49 @@ const app = {
     if (legendSub) legendSub.textContent = 'Pixel-level · Sentinel-5P';
   },
 
-  // Load GeoJSON data
+  // Load GeoJSON data — uses backend API when available, static files otherwise
   async loadData() {
     try {
-      const [lgasBoundaryResponse, lgasEmissionsResponse, landfillsResponse, placesResponse] = await Promise.all([
+      const authHeaders = this.state.authToken
+        ? { 'Authorization': `Bearer ${this.state.authToken}` } : {};
+
+      // Boundary and places are always loaded from static files (no sensitive data)
+      const [lgasBoundaryResponse, placesResponse] = await Promise.all([
         fetch('data/lga_boundary.geojson'),
-        fetch('data/lga_emissions.geojson'),
-        fetch('data/landfills.geojson'),
         fetch('data/places.geojson'),
       ]);
-
       this.state.data.lgasBoundary = await lgasBoundaryResponse.json();
-      this.state.data.lgas = await lgasEmissionsResponse.json();
-      const landfillsData = await landfillsResponse.json();
-      this.state.data.emissionPoints = landfillsData;
-      this.state.data.landfills = landfillsData;
-      this.state.data.places = await placesResponse.json();
+      this.state.data.places       = await placesResponse.json();
 
-      // Populate LGA selector
+      // Emissions + landfills: use API if backend is active, else static files
+      if (this.state.backendMode) {
+        const [emResp, lfResp] = await Promise.all([
+          fetch(`${this.state.BACKEND_URL}/api/emissions`,  { headers: authHeaders }),
+          fetch(`${this.state.BACKEND_URL}/api/landfills`,  { headers: authHeaders }),
+        ]);
+        if (emResp.status === 401 || lfResp.status === 401) {
+          this.showLoginModal(); return;
+        }
+        this.state.data.lgas = await emResp.json();
+        const lf = await lfResp.json();
+        this.state.data.emissionPoints = lf;
+        this.state.data.landfills      = lf;
+      } else {
+        const [emResp, lfResp] = await Promise.all([
+          fetch('data/lga_emissions.geojson'),
+          fetch('data/landfills.geojson'),
+        ]);
+        this.state.data.lgas = await emResp.json();
+        const lf = await lfResp.json();
+        this.state.data.emissionPoints = lf;
+        this.state.data.landfills      = lf;
+      }
+
       this.populateLGASelector();
       console.log('Data loaded successfully');
     } catch (error) {
       console.error('Error loading data:', error);
-      this.showNotification('Error loading GeoJSON data');
+      this.showNotification('Error loading data');
     }
   },
 
@@ -1458,6 +1490,7 @@ const app = {
         else if (item.dataset.section === 'about')      { this.closeSpatialAnalysis(); this.closeLandfills(); this.openAbout(); }
         else if (item.dataset.section === 'dumpsites')  { this.closeSpatialAnalysis(); this.closeGas(); this.openLandfills(); }
         else if (item.dataset.section === 'gas')        { this.closeSpatialAnalysis(); this.closeLandfills(); this.openGas(); }
+        else if (item.dataset.section === 'admin')      { this.openAdminPanel(); }
         else                                            { this.closeSpatialAnalysis(); this.closeLandfills(); this.closeGas(); }
       });
     });
@@ -4875,6 +4908,246 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
     } else {
       this.showNotification('LGA not found. Please try a different search term.');
     }
+  },
+
+  // ── Auth & Backend ──────────────────────────────────────────────────────────
+
+  async checkBackend() {
+    try {
+      const r = await fetch(`${this.state.BACKEND_URL}/api/health`, { signal: AbortSignal.timeout(2000) });
+      this.state.backendMode = r.ok;
+    } catch {
+      this.state.backendMode = false;
+    }
+    return this.state.backendMode;
+  },
+
+  async restoreSession() {
+    const token = sessionStorage.getItem('erm_token');
+    if (!token) return false;
+    try {
+      const r = await fetch(`${this.state.BACKEND_URL}/api/auth/me`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+        signal: AbortSignal.timeout(4000),
+      });
+      if (!r.ok) { sessionStorage.removeItem('erm_token'); return false; }
+      const u = await r.json();
+      this._applySession(token, u.username, u.role);
+      return true;
+    } catch { return false; }
+  },
+
+  _applySession(token, username, role) {
+    this.state.authToken   = token;
+    this.state.authUsername = username;
+    this.state.authRole    = role;
+    sessionStorage.setItem('erm_token', token);
+    // Show user pill in sidebar
+    const pill = document.getElementById('sidebarUser');
+    if (pill) pill.style.display = 'block';
+    const unEl = document.getElementById('sidebarUsername');
+    if (unEl) unEl.textContent = username;
+    const rlEl = document.getElementById('sidebarRole');
+    if (rlEl) rlEl.textContent = role === 'admin' ? 'Administrator' : 'Viewer';
+    // Show admin nav item only for admins
+    const adminNav = document.getElementById('adminNavItem');
+    if (adminNav) adminNav.style.display = role === 'admin' ? 'flex' : 'none';
+  },
+
+  showLoginModal() {
+    const overlay = document.getElementById('loginOverlay');
+    if (overlay) { overlay.style.display = 'flex'; }
+    setTimeout(() => document.getElementById('loginUsername')?.focus(), 100);
+  },
+
+  hideLoginModal() {
+    const overlay = document.getElementById('loginOverlay');
+    if (overlay) overlay.style.display = 'none';
+  },
+
+  async handleLoginSubmit(e) {
+    e.preventDefault();
+    const username = document.getElementById('loginUsername')?.value.trim();
+    const password = document.getElementById('loginPassword')?.value;
+    const errEl    = document.getElementById('loginError');
+    const btn      = document.getElementById('loginBtn');
+    if (!username || !password) {
+      errEl.textContent = 'Please enter username and password.';
+      errEl.style.display = 'block'; return;
+    }
+    btn.textContent = 'Signing in…'; btn.disabled = true;
+    try {
+      const r = await fetch(`${this.state.BACKEND_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+      const data = await r.json();
+      if (!r.ok) {
+        errEl.textContent = data.error || 'Login failed.';
+        errEl.style.display = 'block';
+        btn.textContent = 'Sign In'; btn.disabled = false; return;
+      }
+      this._applySession(data.token, data.username, data.role);
+      this.hideLoginModal();
+      // Continue app init from where we left off
+      await this.loadData();
+      this.initializeMap();
+      this.attachEventListeners();
+      this.initDrawTools();
+      this.updateDashboard();
+      await this.initGEEMode();
+      await this.toggleGEELagosLayer(true);
+      if (this.map.hasLayer(this.layers.lgas)) this.map.removeLayer(this.layers.lgas);
+      await this.addRasterLayer();
+      const legendSub = document.getElementById('legendSub');
+      if (legendSub) legendSub.textContent = 'Pixel-level · Sentinel-5P';
+    } catch (err) {
+      errEl.textContent = 'Connection error. Is the backend running?';
+      errEl.style.display = 'block';
+      btn.textContent = 'Sign In'; btn.disabled = false;
+    }
+  },
+
+  logout() {
+    sessionStorage.removeItem('erm_token');
+    this.state.authToken   = null;
+    this.state.authUsername = null;
+    this.state.authRole    = null;
+    const pill = document.getElementById('sidebarUser');
+    if (pill) pill.style.display = 'none';
+    const adminNav = document.getElementById('adminNavItem');
+    if (adminNav) adminNav.style.display = 'none';
+    this.closeAdminPanel();
+    this.showLoginModal();
+  },
+
+  // ── Admin panel ─────────────────────────────────────────────────────────────
+
+  openAdminPanel() {
+    document.getElementById('adminPanel')?.classList.add('open');
+    this.loadAdminUsers();
+  },
+
+  closeAdminPanel() {
+    document.getElementById('adminPanel')?.classList.remove('open');
+  },
+
+  _adminStatusEl(id, msg, ok) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.style.display   = 'block';
+    el.textContent     = msg;
+    el.style.background = ok ? 'rgba(0,229,160,0.12)' : 'rgba(239,68,68,0.12)';
+    el.style.color      = ok ? '#00e5a0' : '#ef4444';
+    el.style.border     = `1px solid ${ok ? 'rgba(0,229,160,0.3)' : 'rgba(239,68,68,0.3)'}`;
+  },
+
+  async uploadEmissionsCSV(input) {
+    const file = input.files[0];
+    if (!file) return;
+    input.value = '';
+    this._adminStatusEl('emissionsUploadStatus', 'Uploading and processing…', true);
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+      const r = await fetch(`${this.state.BACKEND_URL}/api/admin/emissions/upload`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${this.state.authToken}` },
+        body: fd,
+      });
+      const data = await r.json();
+      if (!r.ok) { this._adminStatusEl('emissionsUploadStatus', data.error || 'Upload failed', false); return; }
+      this._adminStatusEl('emissionsUploadStatus',
+        `Done — ${data.records} records updated. Years: ${data.years.join(', ')}. Reloading data…`, true);
+      // Reload dashboard data silently
+      await this.loadData();
+      this.updateDashboard();
+      this.showNotification(`Emissions updated — ${data.records} records across ${data.years.length} year(s)`, 'success');
+    } catch (err) {
+      this._adminStatusEl('emissionsUploadStatus', `Error: ${err.message}`, false);
+    }
+  },
+
+  async uploadLandfillsGeoJSON(input) {
+    const file = input.files[0];
+    if (!file) return;
+    input.value = '';
+    this._adminStatusEl('landfillsUploadStatus', 'Uploading…', true);
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+      const r = await fetch(`${this.state.BACKEND_URL}/api/admin/landfills/upload`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${this.state.authToken}` },
+        body: fd,
+      });
+      const data = await r.json();
+      if (!r.ok) { this._adminStatusEl('landfillsUploadStatus', data.error || 'Upload failed', false); return; }
+      this._adminStatusEl('landfillsUploadStatus', `Done — ${data.count} landfill features loaded. Refreshing…`, true);
+      await this.loadData();
+      this.updateDashboard();
+      this.showNotification(`Landfills updated — ${data.count} features`, 'success');
+    } catch (err) {
+      this._adminStatusEl('landfillsUploadStatus', `Error: ${err.message}`, false);
+    }
+  },
+
+  async loadAdminUsers() {
+    const el = document.getElementById('adminUsersList');
+    if (!el) return;
+    el.textContent = 'Loading…';
+    try {
+      const r = await fetch(`${this.state.BACKEND_URL}/api/admin/users`, {
+        headers: { 'Authorization': `Bearer ${this.state.authToken}` },
+      });
+      const users = await r.json();
+      if (!r.ok) { el.textContent = users.error || 'Failed to load users'; return; }
+      el.innerHTML = users.map(u => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border)">
+          <div>
+            <span style="font-weight:600;color:var(--t1)">${u.username}</span>
+            <span style="font-size:9px;background:${u.role==='admin'?'rgba(249,115,22,0.15)':'rgba(0,212,255,0.1)'};color:${u.role==='admin'?'#f97316':'#00d4ff'};border-radius:99px;padding:1px 7px;margin-left:6px;font-weight:700">${u.role}</span>
+          </div>
+          ${u.username !== this.state.authUsername ? `<button onclick="app.deleteUser(${u.id},'${u.username}')" style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:10px">Remove</button>` : ''}
+        </div>`).join('') || '<div style="color:var(--t3)">No users found</div>';
+    } catch (err) {
+      el.textContent = `Error: ${err.message}`;
+    }
+  },
+
+  async createUser() {
+    const username = document.getElementById('newUserName')?.value.trim();
+    const password = document.getElementById('newUserPass')?.value;
+    const role     = document.getElementById('newUserRole')?.value;
+    const statusEl = 'userCreateStatus';
+    if (!username || !password) { this._adminStatusEl(statusEl, 'Username and password are required', false); return; }
+    try {
+      const r = await fetch(`${this.state.BACKEND_URL}/api/admin/users`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${this.state.authToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password, role }),
+      });
+      const data = await r.json();
+      if (!r.ok) { this._adminStatusEl(statusEl, data.error || 'Failed to create user', false); return; }
+      this._adminStatusEl(statusEl, `User "${username}" created as ${role}`, true);
+      document.getElementById('newUserName').value = '';
+      document.getElementById('newUserPass').value = '';
+      this.loadAdminUsers();
+    } catch (err) { this._adminStatusEl(statusEl, `Error: ${err.message}`, false); }
+  },
+
+  async deleteUser(uid, username) {
+    if (!confirm(`Remove user "${username}"?`)) return;
+    try {
+      const r = await fetch(`${this.state.BACKEND_URL}/api/admin/users/${uid}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${this.state.authToken}` },
+      });
+      const data = await r.json();
+      if (!r.ok) { this.showNotification(data.error || 'Failed to delete user', 'error'); return; }
+      this.loadAdminUsers();
+    } catch (err) { this.showNotification(`Error: ${err.message}`, 'error'); }
   },
 
   // Show notification  (type: 'error' | 'success' | 'info')

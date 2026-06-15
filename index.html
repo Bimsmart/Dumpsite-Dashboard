@@ -32,7 +32,26 @@
       <li class="nav-item" data-section="dumpsites"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00d4ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span><span class="nav-label">Landfills</span></li>
       <li class="nav-item" data-section="about"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00d4ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></span><span class="nav-label">About</span></li>
       <li class="nav-item" data-section="reports"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00d4ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10,9 9,9 8,9"/></svg></span><span class="nav-label">Reports</span></li>
+      <li class="nav-item" id="adminNavItem" data-section="admin" style="display:none"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span><span class="nav-label" style="color:#f97316">Admin</span></li>
     </ul>
+
+    <!-- User pill at bottom of sidebar (shown when logged in via backend) -->
+    <div id="sidebarUser" style="display:none;padding:10px 14px;border-top:1px solid var(--border);margin-top:auto">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <div style="display:flex;align-items:center;gap:8px;min-width:0">
+          <div style="width:28px;height:28px;border-radius:50%;background:rgba(0,212,255,0.15);border:1px solid rgba(0,212,255,0.3);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#00d4ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </div>
+          <div style="min-width:0;overflow:hidden">
+            <div id="sidebarUsername" style="font-size:11px;font-weight:600;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
+            <div id="sidebarRole" style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.6px"></div>
+          </div>
+        </div>
+        <button onclick="app.logout()" title="Sign out" style="background:none;border:none;cursor:pointer;padding:4px;color:var(--t3);flex-shrink:0">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
+      </div>
+    </div>
 
     <div class="sidebar-controls">
       <div class="ctrl-label">YEAR</div>
@@ -833,6 +852,108 @@
   </div>
 
 
+
+<!-- ── LOGIN MODAL ── -->
+<div id="loginOverlay" style="display:none;position:fixed;inset:0;background:rgba(7,12,20,0.97);z-index:99999;display:flex;align-items:center;justify-content:center">
+  <div style="background:var(--surface,#111827);border:1px solid rgba(0,212,255,0.2);border-radius:16px;padding:36px 40px;width:340px;max-width:92vw;box-shadow:0 24px 80px rgba(0,0,0,0.6)">
+    <div style="text-align:center;margin-bottom:24px">
+      <img src="logo.png" alt="Logo" style="width:56px;height:56px;object-fit:contain;border-radius:10px;margin-bottom:12px">
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700;color:#00d4ff">Lagos ERM</div>
+      <div style="font-size:11px;color:#7a8fa8;margin-top:3px">Environmental Risk Monitor</div>
+    </div>
+    <form id="loginForm" onsubmit="app.handleLoginSubmit(event)">
+      <div style="margin-bottom:12px">
+        <label style="font-size:10px;font-weight:600;color:#7a8fa8;text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:5px">Username</label>
+        <input id="loginUsername" type="text" autocomplete="username" placeholder="Enter username"
+          style="width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:10px 12px;color:var(--t1,#e2e8f0);font-size:13px;outline:none;box-sizing:border-box">
+      </div>
+      <div style="margin-bottom:18px">
+        <label style="font-size:10px;font-weight:600;color:#7a8fa8;text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:5px">Password</label>
+        <input id="loginPassword" type="password" autocomplete="current-password" placeholder="Enter password"
+          style="width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:10px 12px;color:var(--t1,#e2e8f0);font-size:13px;outline:none;box-sizing:border-box">
+      </div>
+      <div id="loginError" style="display:none;color:#ef4444;font-size:11px;text-align:center;margin-bottom:10px;padding:6px;background:rgba(239,68,68,0.1);border-radius:6px"></div>
+      <button type="submit" id="loginBtn"
+        style="width:100%;background:linear-gradient(135deg,#0284c7,#0ea5e9);color:#fff;border:none;border-radius:8px;padding:11px;font-size:13px;font-weight:600;cursor:pointer;letter-spacing:.3px">
+        Sign In
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- ── ADMIN PANEL ── -->
+<div class="sa-panel" id="adminPanel">
+  <div class="sa-header">
+    <div class="sa-title">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      Admin Panel
+    </div>
+    <button class="sa-close" onclick="app.closeAdminPanel()" title="Close">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7a8fa8" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+
+  <div style="padding:14px;display:flex;flex-direction:column;gap:16px;overflow-y:auto;flex:1">
+
+    <!-- Upload Emissions CSV -->
+    <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:14px">
+      <div style="font-size:11px;font-weight:700;color:#00d4ff;text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">Update Emission Data</div>
+      <div style="font-size:10px;color:var(--t3);margin-bottom:10px;line-height:1.5">
+        Upload a CSV to update LGA emission values.<br>
+        <strong style="color:var(--t2)">Format A (pre-joined):</strong> lganame, year, ch4, no2, co, isi, hotspots<br>
+        <strong style="color:var(--t2)">Format B (point-based):</strong> longitude, latitude, year, ch4, no2, co, isi, hotspots
+      </div>
+      <input type="file" id="emissionsCSVInput" accept=".csv" style="display:none" onchange="app.uploadEmissionsCSV(this)">
+      <button onclick="document.getElementById('emissionsCSVInput').click()"
+        style="width:100%;background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.3);color:#00d4ff;border-radius:7px;padding:9px;font-size:11px;font-weight:600;cursor:pointer">
+        Choose CSV &amp; Upload
+      </button>
+      <div id="emissionsUploadStatus" style="display:none;margin-top:8px;font-size:10px;padding:6px 8px;border-radius:6px"></div>
+    </div>
+
+    <!-- Upload Landfills GeoJSON -->
+    <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:14px">
+      <div style="font-size:11px;font-weight:700;color:#a855f7;text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">Update Landfill Sites</div>
+      <div style="font-size:10px;color:var(--t3);margin-bottom:10px;line-height:1.5">
+        Upload a GeoJSON FeatureCollection of Point features to replace the current landfill dataset.
+        Each feature should have <em>Name</em> and <em>Status</em> properties.
+      </div>
+      <input type="file" id="landfillsGeoJSONInput" accept=".geojson,.json" style="display:none" onchange="app.uploadLandfillsGeoJSON(this)">
+      <button onclick="document.getElementById('landfillsGeoJSONInput').click()"
+        style="width:100%;background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.3);color:#a855f7;border-radius:7px;padding:9px;font-size:11px;font-weight:600;cursor:pointer">
+        Choose GeoJSON &amp; Upload
+      </button>
+      <div id="landfillsUploadStatus" style="display:none;margin-top:8px;font-size:10px;padding:6px 8px;border-radius:6px"></div>
+    </div>
+
+    <!-- User Management -->
+    <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-size:11px;font-weight:700;color:#f97316;text-transform:uppercase;letter-spacing:.7px">User Management</div>
+        <button onclick="app.loadAdminUsers()" style="background:none;border:none;cursor:pointer;color:#7a8fa8;font-size:10px">Refresh</button>
+      </div>
+      <div id="adminUsersList" style="font-size:11px;color:var(--t2);margin-bottom:10px">Loading…</div>
+      <div style="border-top:1px solid var(--border);padding-top:10px;margin-top:4px">
+        <div style="font-size:10px;font-weight:600;color:var(--t2);margin-bottom:7px">Add User</div>
+        <input id="newUserName" type="text" placeholder="Username"
+          style="width:100%;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:6px;padding:7px 9px;color:var(--t1);font-size:11px;margin-bottom:5px;box-sizing:border-box">
+        <input id="newUserPass" type="password" placeholder="Password (min 6 chars)"
+          style="width:100%;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:6px;padding:7px 9px;color:var(--t1);font-size:11px;margin-bottom:5px;box-sizing:border-box">
+        <select id="newUserRole"
+          style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:7px 9px;color:var(--t1);font-size:11px;margin-bottom:8px;box-sizing:border-box">
+          <option value="viewer">Viewer</option>
+          <option value="admin">Admin</option>
+        </select>
+        <button onclick="app.createUser()"
+          style="width:100%;background:rgba(249,115,22,0.12);border:1px solid rgba(249,115,22,0.3);color:#f97316;border-radius:6px;padding:8px;font-size:11px;font-weight:600;cursor:pointer">
+          Create User
+        </button>
+        <div id="userCreateStatus" style="display:none;margin-top:6px;font-size:10px;padding:5px 7px;border-radius:5px"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
 
 <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
 
