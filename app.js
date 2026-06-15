@@ -4487,14 +4487,25 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
       sampleLatLngs, latlngs,
     };
 
+    const validCount = results.filter(r => r.value != null).length;
+    const coverageNote = validCount < results.length
+      ? `<span style="color:#f59e0b"> · ${validCount}/${results.length} in coverage</span>` : '';
+
     this.showDrawResults('Emission Transect', `
       <div style="font-size:10px;color:var(--t2);margin-bottom:2px">
-        ${mLabel} · ${year} · ${(totalDist/1000).toFixed(2)} km · ${samples.length} samples
+        ${mLabel} · ${year} · ${(totalDist/1000).toFixed(2)} km · ${samples.length} samples${coverageNote}
       </div>
       <div style="font-size:9px;color:var(--t3)">Hover the chart to trace the position on the map</div>
     `, true);
 
     const wrap = document.getElementById('drawTransectWrap');
+    if (validCount === 0) {
+      if (wrap) wrap.style.display = 'none';
+      const resultContent = document.getElementById('drawResultsContent');
+      if (resultContent) resultContent.innerHTML +=
+        `<div style="color:#f59e0b;font-size:11px;padding:6px 0;margin-top:4px">No data along this transect — line may be outside the raster coverage area.</div>`;
+      return;
+    }
     if (wrap) wrap.style.display = 'block';
     const canvas = document.getElementById('drawTransectChart');
     if (!canvas) return;
@@ -4528,13 +4539,14 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
               legend: { display: false },
               tooltip: { callbacks: {
                 title: c => `${c[0].label} km`,
-                label: c => `${mLabel}: ${c.raw != null ? c.raw.toFixed(5) : 'N/A'}`,
+                label: c => `${mLabel}: ${c.raw != null ? c.raw.toFixed(5) : 'no data'}`,
               }},
             },
             scales: {
               x: { title:{ display:true, text:'Distance (km)', color:'#7a8fa8', font:{size:9} },
                    ticks:{ color:'#7a8fa8', font:{size:8}, maxTicksLimit:6 }, grid:{ color:'rgba(255,255,255,0.04)' } },
-              y: { title:{ display:true, text:`${mLabel} (mol/m²)`, color:'#7a8fa8', font:{size:9} },
+              y: { min: 0,
+                   title:{ display:true, text:`${mLabel} (mol/m²)`, color:'#7a8fa8', font:{size:9} },
                    ticks:{ color:'#7a8fa8', font:{size:8} }, grid:{ color:'rgba(255,255,255,0.04)' } },
             },
           },
@@ -4562,16 +4574,23 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
 
       canvas.style.cursor = 'crosshair';
       canvas.onmousemove = (evt) => {
-        if (!this.charts.transect || !this._profileCursorSamples) return;
-        const els = this.charts.transect.getElementsAtEventForMode(evt, 'index', { intersect: false }, false);
-        if (els.length) {
-          const idx = Math.min(els[0].index, this._profileCursorSamples.length - 1);
-          const ll  = this._profileCursorSamples[idx];
-          if (ll) { this._profileCursor.setLatLng(ll); this._profileCursor.setOpacity(1); }
-        }
+        if (!this._profileCursorSamples || !this._profileCursor) return;
+        const chart = this.charts.transect;
+        if (!chart) return;
+        // Derive the sample index directly from mouse x-position within the chart
+        // area — avoids relying on getElementsAtEventForMode which returns nothing
+        // for null data points (e.g. when part of the line is outside raster coverage).
+        const ca = chart.chartArea;
+        if (!ca) return;
+        const rect = canvas.getBoundingClientRect();
+        const x = evt.clientX - rect.left;
+        if (x < ca.left || x > ca.right) { this._profileCursor.setOpacity(0); return; }
+        const frac = (x - ca.left) / (ca.right - ca.left);
+        const idx  = Math.min(Math.round(frac * (this._profileCursorSamples.length - 1)), this._profileCursorSamples.length - 1);
+        const ll   = this._profileCursorSamples[idx];
+        if (ll) { this._profileCursor.setLatLng(ll); this._profileCursor.setOpacity(1); }
       };
       canvas.onmouseleave = () => { if (this._profileCursor) this._profileCursor.setOpacity(0); };
-    };
     // Use setTimeout instead of rAF: rAF fires before the browser reflows the
     // newly-shown drawTransectWrap, causing clientHeight to read as 0 and the
     // dimension-check loop inside renderTransectChart to spin forever.
