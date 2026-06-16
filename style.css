@@ -276,13 +276,219 @@ html, body { height:100%; font-family:'Inter',sans-serif; background:var(--bg); 
 ::-webkit-scrollbar-thumb { background:var(--border); border-radius:99px; }
 ::-webkit-scrollbar-thumb:hover { background:var(--t3); }
 
-/* ── Responsive ── */
-@media (max-width:1200px) { :root { --sidebar-w:180px; --charts-h:190px; } }
+/* ══════════════════════════════════════════════════════
+   MOBILE / RESPONSIVE
+   ══════════════════════════════════════════════════════ */
+
+/* These elements exist in DOM at all sizes; CSS shows/hides them */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  z-index: 999;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s;
+}
+.sidebar-overlay.visible { opacity: 1; pointer-events: auto; }
+
+.mobile-menu-btn {
+  display: none;
+  align-items: center; justify-content: center;
+  width: 36px; height: 36px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  cursor: pointer; color: var(--t2); flex-shrink: 0;
+  transition: all .2s;
+}
+.mobile-menu-btn:hover { border-color: var(--border-h); color: var(--accent); }
+
+.mobile-bottom-nav {
+  display: none;
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: calc(56px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: var(--sidebar);
+  border-top: 1px solid var(--border);
+  z-index: 1001;
+  align-items: center; justify-content: space-around;
+}
+.mobile-nav-btn {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 3px;
+  background: none; border: none;
+  cursor: pointer; color: var(--t3);
+  padding: 4px 6px; border-radius: var(--r-md);
+  font-size: 8px; font-weight: 600;
+  letter-spacing: .3px; text-transform: uppercase;
+  min-width: 44px; transition: color .15s;
+}
+.mobile-nav-btn.active { color: var(--accent); }
+.mobile-nav-btn svg { flex-shrink: 0; display: block; }
+
+.mobile-info-btn {
+  display: none;
+  position: absolute;
+  top: 10px; right: 10px;
+  z-index: 450;
+  width: 38px; height: 38px;
+  background: var(--map-legend-bg);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  align-items: center; justify-content: center;
+  cursor: pointer; color: var(--t2);
+  box-shadow: var(--sh-md); transition: all .2s;
+}
+.mobile-info-btn.active { border-color: var(--border-h); color: var(--accent); }
+
+/* ── Small desktop ≤1200px ── */
+@media (max-width:1200px) {
+  :root { --sidebar-w:180px; --charts-h:190px; }
+}
+
+/* ── Tablet 641–900px ── */
 @media (max-width:900px) {
   .sidebar { width:52px; }
-  .brand-text,.nav-label,.sidebar-controls { display:none; }
-  .right-panel { width:200px; }
+  .brand-text, .nav-label, .sidebar-controls { display:none; }
+  .right-panel { width:210px; }
   .topbar-kpis { display:none; }
+}
+
+/* ── Mobile ≤640px ──────────────────────────────────── */
+@media (max-width:640px) {
+  /* Use dynamic viewport height to avoid iOS browser-chrome cutoff */
+  :root { --topbar-h: 54px; --mob-nav-h: calc(56px + env(safe-area-inset-bottom,0px)); }
+
+  html, body { overflow: hidden; height: 100%; }
+
+  .app-shell {
+    height: 100vh;                        /* base fallback */
+    height: var(--app-height, 100dvh);    /* JS-set real vh, falls back to dvh */
+  }
+
+  /* ── Sidebar: hidden overlay drawer from left ── */
+  .sidebar {
+    position: fixed !important;
+    top: 0; left: 0; bottom: 0;
+    width: min(280px, 88vw) !important;
+    height: 100% !important;
+    transform: translateX(-100%);
+    transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
+    z-index: 1002;
+    will-change: transform;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  .sidebar.mobile-open { transform: translateX(0); box-shadow: 4px 0 24px rgba(0,0,0,0.6); }
+
+  /* Restore elements hidden at 900px breakpoint */
+  .sidebar .brand-text    { display: flex !important; flex-direction: column; }
+  .sidebar .nav-label     { display: inline !important; }
+  .sidebar .sidebar-controls { display: flex !important; }
+
+  /* Show mobile-only UI */
+  .sidebar-overlay { display: block; }
+  .mobile-menu-btn { display: flex; }
+  .mobile-info-btn { display: flex; }
+  .mobile-bottom-nav { display: flex; }
+
+  /* ── Topbar: compact ── */
+  .topbar { padding: 0 10px; gap: 8px; }
+  .topbar-center { display: none !important; }
+  .topbar-kpis   { display: none !important; }
+  .page-title    { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .page-sub      { display: none; }
+  .topbar-left   { min-width: 0; flex: 1; overflow: hidden; }
+  .theme-switcher { gap: 2px; flex-shrink: 0; }
+  .theme-btn { width: 26px; height: 26px; }
+
+  /* ── Main area fills the space between topbar and bottom nav ── */
+  .main-area { overflow: hidden; }
+
+  /* ── Content row: full height map ── */
+  .content-row { overflow: visible; }   /* allow fixed children to escape clipping */
+
+  /* ── Right panel: bottom sheet ── */
+  .right-panel {
+    position: fixed !important;
+    left: 0; right: 0;
+    bottom: var(--mob-nav-h);
+    top: auto;
+    width: 100% !important;
+    height: min(60vh, 480px);
+    border-left: none;
+    border-top: 1px solid rgba(255,255,255,0.12);
+    border-radius: 14px 14px 0 0;
+    transform: translateY(110%);
+    transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+    z-index: 800;
+    overflow-y: auto;
+    box-shadow: 0 -8px 32px rgba(0,0,0,0.55);
+    will-change: transform;
+  }
+  .right-panel.mobile-open { transform: translateY(0); }
+  .right-panel::before {        /* drag-handle hint */
+    content: '';
+    display: block;
+    width: 36px; height: 4px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.15);
+    margin: 10px auto 4px;
+  }
+
+  /* ── SA / gas / landfills / admin panels: full-screen overlays ── */
+  .sa-panel {
+    position: fixed !important;
+    top: var(--topbar-h); left: 0; right: 0;
+    bottom: var(--mob-nav-h);
+    width: 100% !important;
+    height: auto !important;
+    z-index: 900;
+  }
+
+  /* ── About overlay ── */
+  #aboutOverlay {
+    position: fixed !important;
+    z-index: 1050 !important;
+  }
+
+  /* ── Bottom charts: hidden ── */
+  .bottom-row { display: none !important; }
+
+  /* ── Map legend: compact, keep clear of bottom nav ── */
+  .map-legend {
+    bottom: calc(var(--mob-nav-h) + 8px);
+    left: 8px;
+    max-width: min(220px, calc(100vw - 16px));
+    padding: 10px 12px;
+    max-height: 180px;
+  }
+  .buffer-legend {
+    left: 8px;
+    bottom: calc(var(--mob-nav-h) + 8px);
+    min-width: 130px;
+  }
+
+  /* ── Leaflet controls: above bottom nav ── */
+  .leaflet-bottom { bottom: var(--mob-nav-h) !important; }
+
+  /* ── Draw results: float above bottom nav ── */
+  #drawResultsSection {
+    bottom: calc(var(--mob-nav-h) + 8px) !important;
+    left: 8px !important;
+    right: 8px !important;
+    width: auto !important;
+    max-width: none !important;
+  }
+
+  /* ── Map tip ── */
+  .map-tip { bottom: calc(var(--mob-nav-h) + 10px); font-size: 9px; }
 }
 
 /* ── Flat SVG icon sizing ────────────────────────────── */

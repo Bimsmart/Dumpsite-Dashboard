@@ -75,6 +75,11 @@ const app = {
   // Each combination is rendered only once; subsequent calls reuse the cached overlay.
   _overlayCache: {},
 
+  // Monotonically-increasing counter. Each addRasterLayer() call stamps its own
+  // id; if the id changes before the async work finishes, the stale result is
+  // discarded so a fast year/metric switch never leaves the wrong overlay on screen.
+  _rasterLoadId: 0,
+
   // Color scales for different metrics
   colorScales: {
     ch4: ['#16a34a', '#d9f99d', '#facc15', '#f97316', '#dc2626', '#7c2d12'],
@@ -1492,6 +1497,7 @@ const app = {
         else if (item.dataset.section === 'gas')        { this.closeSpatialAnalysis(); this.closeLandfills(); this.openGas(); }
         else if (item.dataset.section === 'admin')      { this.openAdminPanel(); }
         else                                            { this.closeSpatialAnalysis(); this.closeLandfills(); this.closeGas(); }
+        this.closeMobileSidebar();
       });
     });
     document.getElementById('saClose')?.addEventListener('click',    () => this.closeSpatialAnalysis());
@@ -2656,6 +2662,13 @@ const app = {
   },
 
   async addRasterLayer() {
+    // Stamp this call. If the user switches year/metric again before this async
+    // function finishes, the id will have changed and we discard the stale result
+    // instead of painting the wrong overlay on top of the correct one.
+    const loadId = ++this._rasterLoadId;
+
+    // Remove the current overlay immediately so the old year never overlaps
+    // the new one — even if the new raster takes a moment to load.
     if (this.layers.raster) {
       this.map.removeLayer(this.layers.raster);
       this.layers.raster = null;
@@ -2690,6 +2703,14 @@ const app = {
     };
 
     const georaster = await this.loadRaster(year);
+
+    // Another call started while we were fetching — silently abort.
+    if (loadId !== this._rasterLoadId) {
+      clearTimeout(toastTimer);
+      document.getElementById('raster-loading-toast')?.remove();
+      return;
+    }
+
     if (!georaster) {
       clearTimeout(toastTimer);
       document.getElementById('raster-loading-toast')?.remove();
@@ -2727,6 +2748,14 @@ const app = {
     if (this.state.geeMode) {
       // ── GEE live tiles ──────────────────────────────────
       const tileURL = await this.getGEETileURL(metric, year);
+
+      // Check again after the second await — GEE tile URL fetch can also be slow.
+      if (loadId !== this._rasterLoadId) {
+        clearTimeout(toastTimer);
+        document.getElementById('raster-loading-toast')?.remove();
+        return;
+      }
+
       this.layers.raster = L.tileLayer(tileURL, {
         opacity: 0.75,
         attribution: 'Google Earth Engine · Sentinel-5P',
@@ -2888,8 +2917,22 @@ const app = {
       fCtx.clip('evenodd');
     }
 
+    fCtx.imageSmoothingEnabled = false;
     fCtx.drawImage(offscreen, 0, 0);
-    const dataUrl = final.toDataURL('image/png');
+
+    // Upscale with nearest-neighbor before exporting so the browser doesn't
+    // bleed colour from valid pixels into adjacent nodata (transparent) cells
+    // when it stretches the overlay to fill the map — which would falsely show
+    // nodata areas as orange/red and imply risk where there is none.
+    const SCALE  = Math.max(1, Math.ceil(1024 / Math.max(width, height)));
+    const scaled = document.createElement('canvas');
+    scaled.width  = width  * SCALE;
+    scaled.height = height * SCALE;
+    const sCtx = scaled.getContext('2d');
+    sCtx.imageSmoothingEnabled = false;
+    sCtx.drawImage(final, 0, 0, scaled.width, scaled.height);
+
+    const dataUrl = scaled.toDataURL('image/png');
     const bounds  = L.latLngBounds([[ymin, xmin], [ymax, xmax]]);
     return L.imageOverlay(dataUrl, bounds, { opacity: 1, interactive: false, pane: 'overlayPane' });
   },
@@ -4466,7 +4509,6 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
           const row = Math.floor((gr.ymax - s.latlng.lat) / gr.pixelHeight);
           if (row >= 0 && row < gr.height && col >= 0 && col < gr.width) {
             const raw = gr.values[bi]?.[row]?.[col];
-            // Reject only true nodata (null, NaN, the georaster noDataValue, or large sentinel like -9999)
             const isNodata = raw == null || isNaN(raw)
               || (nodata != null && raw === nodata)
               || raw < -9000;
@@ -4513,6 +4555,12 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
     // Defer chart creation until the positioned parent has layout dimensions.
     // Check the parent div (not the canvas itself — canvas has no intrinsic size
     // before Chart.js initialises, so clientHeight is always 0 at first).
+    // null → 0 so the line always spans the full transect length.
+    // nullMask tracks which indices were originally no-data so we can
+    // style those segments differently and show "no data" in tooltips.
+    const nullMask   = results.map(r => r.value == null);
+    const chartData  = results.map(r => r.value ?? 0);
+
     const renderTransectChart = () => {
       if (!canvas) return;
       const chartParent = canvas.parentElement;
@@ -4527,9 +4575,25 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
             labels: results.map(r => (r.distance / 1000).toFixed(2)),
             datasets: [{
               label: `${mLabel} (mol/m²)`,
-              data:  results.map(r => r.value),
+              data:  chartData,
               borderColor: mColor, backgroundColor: mColor + '18',
-              borderWidth: 2, pointRadius: 3, fill: true, tension: 0.3, spanGaps: true,
+              borderWidth: 2, pointRadius: 3, fill: true, tension: 0.3,
+              // Style each segment: dashed grey where either endpoint was no-data
+              segment: {
+                borderColor: ctx =>
+                  (nullMask[ctx.p0DataIndex] || nullMask[ctx.p1DataIndex])
+                    ? 'rgba(160,160,160,0.45)' : mColor,
+                borderDash: ctx =>
+                  (nullMask[ctx.p0DataIndex] || nullMask[ctx.p1DataIndex])
+                    ? [4, 4] : [],
+                backgroundColor: ctx =>
+                  (nullMask[ctx.p0DataIndex] || nullMask[ctx.p1DataIndex])
+                    ? 'rgba(0,0,0,0.04)' : mColor + '18',
+              },
+              // Style each point: hide no-data points so only real values show dots
+              pointBackgroundColor: chartData.map((_, i) => nullMask[i] ? 'transparent' : mColor),
+              pointBorderColor:     chartData.map((_, i) => nullMask[i] ? 'transparent' : mColor),
+              pointRadius:          chartData.map((_, i) => nullMask[i] ? 2 : 3),
             }],
           },
           options: {
@@ -4539,7 +4603,12 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
               legend: { display: false },
               tooltip: { callbacks: {
                 title: c => `${c[0].label} km`,
-                label: c => `${mLabel}: ${c.raw != null ? c.raw.toFixed(5) : 'no data'}`,
+                label: c => {
+                  const i = c.dataIndex;
+                  return nullMask[i]
+                    ? `${mLabel}: no data`
+                    : `${mLabel}: ${c.raw.toFixed(5)}`;
+                },
               }},
             },
             scales: {
@@ -4591,6 +4660,7 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
         if (ll) { this._profileCursor.setLatLng(ll); this._profileCursor.setOpacity(1); }
       };
       canvas.onmouseleave = () => { if (this._profileCursor) this._profileCursor.setOpacity(0); };
+    };
     // Use setTimeout instead of rAF: rAF fires before the browser reflows the
     // newly-shown drawTransectWrap, causing clientHeight to read as 0 and the
     // dimension-check loop inside renderTransectChart to spin forever.
@@ -5112,6 +5182,58 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
 
   // ── Admin panel ─────────────────────────────────────────────────────────────
 
+  // ── Mobile responsive helpers ────────────────────────────────────────────────
+
+  toggleMobileSidebar() {
+    const sidebar = document.querySelector('.sidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    const isOpen  = sidebar?.classList.contains('mobile-open');
+    if (isOpen) {
+      sidebar.classList.remove('mobile-open');
+      overlay?.classList.remove('visible');
+    } else {
+      sidebar?.classList.add('mobile-open');
+      overlay?.classList.add('visible');
+    }
+  },
+
+  closeMobileSidebar() {
+    document.querySelector('.sidebar')?.classList.remove('mobile-open');
+    document.getElementById('sidebarOverlay')?.classList.remove('visible');
+  },
+
+  toggleMobileInfoPanel() {
+    const panel  = document.querySelector('.right-panel');
+    const btn    = document.getElementById('mobileInfoBtn');
+    const navBtn = document.querySelector('.mobile-nav-btn[data-mob-section="info"]');
+    const isOpen = panel?.classList.contains('mobile-open');
+    if (isOpen) {
+      panel.classList.remove('mobile-open');
+      btn?.classList.remove('active');
+      if (navBtn) navBtn.classList.remove('active');
+    } else {
+      panel?.classList.add('mobile-open');
+      btn?.classList.add('active');
+      if (navBtn) navBtn.classList.add('active');
+    }
+  },
+
+  // Mirrors .nav-item click logic for the mobile bottom nav
+  mobileNav(btn, section) {
+    // Update active state on mobile nav buttons
+    document.querySelectorAll('.mobile-nav-btn[data-mob-section]').forEach(b => {
+      if (b.dataset.mobSection !== 'info') b.classList.remove('active');
+    });
+    if (section !== 'info') btn?.classList.add('active');
+
+    // Mirror the sidebar nav-item click
+    const sidebarItem = document.querySelector(`.nav-item[data-section="${section}"]`);
+    if (sidebarItem) sidebarItem.click();
+
+    // Close sidebar drawer if open
+    this.closeMobileSidebar();
+  },
+
   openAdminPanel() {
     document.getElementById('adminPanel')?.classList.add('open');
     this.loadAdminUsers();
@@ -5178,6 +5300,55 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
       this.showNotification(`Landfills updated — ${data.count} features`, 'success');
     } catch (err) {
       this._adminStatusEl('landfillsUploadStatus', `Error: ${err.message}`, false);
+    }
+  },
+
+  // ── Generic vector upload (emission-points | lga-boundary | places) ──────────
+  async uploadVector(vname, input, statusElId) {
+    const file = input.files[0];
+    if (!file) return;
+    input.value = '';
+    this._adminStatusEl(statusElId, 'Uploading…', true);
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+      const r    = await fetch(`${this.state.BACKEND_URL}/api/admin/vectors/${vname}/upload`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${this.state.authToken}` },
+        body: fd,
+      });
+      const data = await r.json();
+      if (!r.ok) { this._adminStatusEl(statusElId, data.error || 'Upload failed', false); return; }
+      this._adminStatusEl(statusElId, `Done — ${data.count} features saved to ${data.file}. Refreshing…`, true);
+      await this.loadData();
+      this.updateDashboard();
+      this.showNotification(`${data.file} updated — ${data.count} features`, 'success');
+    } catch (err) {
+      this._adminStatusEl(statusElId, `Error: ${err.message}`, false);
+    }
+  },
+
+  // Download the current GeoJSON for a vector layer as a file
+  async downloadVector(vname) {
+    try {
+      const r = await fetch(`${this.state.BACKEND_URL}/api/admin/vectors/${vname}`, {
+        headers: { 'Authorization': `Bearer ${this.state.authToken}` },
+      });
+      if (!r.ok) {
+        const data = await r.json();
+        this.showNotification(data.error || 'Download failed', 'error');
+        return;
+      }
+      const gj   = await r.json();
+      const blob  = new Blob([JSON.stringify(gj, null, 2)], { type: 'application/geo+json' });
+      const url   = URL.createObjectURL(blob);
+      const a     = document.createElement('a');
+      a.href      = url;
+      a.download  = `${vname}.geojson`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      this.showNotification(`Download error: ${err.message}`, 'error');
     }
   },
 
@@ -5268,5 +5439,20 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
 
 // Initialize on DOM ready
 document.addEventListener('DOMContentLoaded', () => {
+  // Set CSS custom property for real mobile viewport height (iOS Safari fix)
+  const setVh = () => {
+    document.documentElement.style.setProperty('--app-height', `${window.innerHeight}px`);
+  };
+  setVh();
+  window.addEventListener('resize', setVh);
+
+  // Invalidate Leaflet map size on orientation change / resize
+  window.addEventListener('resize', () => {
+    setTimeout(() => { app.map && app.map.invalidateSize({ pan: false }); }, 200);
+  });
+  window.addEventListener('orientationchange', () => {
+    setTimeout(() => { app.map && app.map.invalidateSize({ pan: false }); }, 400);
+  });
+
   app.init();
 });

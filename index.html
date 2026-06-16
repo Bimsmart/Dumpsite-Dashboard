@@ -2,7 +2,7 @@
 <html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Lagos Environmental Risk Dashboard</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,6 +13,9 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<!-- Mobile sidebar backdrop -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="app.closeMobileSidebar()"></div>
+
 <div class="app-shell">
 
   <!-- ── SIDEBAR ── -->
@@ -148,6 +151,10 @@
 
     <!-- TOPBAR -->
     <header class="topbar">
+      <!-- Hamburger: mobile only -->
+      <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Open menu" onclick="app.toggleMobileSidebar()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
       <div class="topbar-left">
         <h1 class="page-title">Lagos <span>Environmental</span> Risk Dashboard</h1>
         <p class="page-sub">Spatial Analysis · Dumpsite Pollution · Gas Emissions · 2018–present</p>
@@ -215,6 +222,10 @@
     <div class="content-row">
       <div class="map-wrap">
         <div id="map"></div>
+        <!-- Info toggle: mobile only, opens right panel as bottom sheet -->
+        <button class="mobile-info-btn" id="mobileInfoBtn" aria-label="Toggle info panel" onclick="app.toggleMobileInfoPanel()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        </button>
         <div id="mapLegend" class="map-legend">
           <strong id="legendTitle">Methane (CH&#8324;)</strong>
           <div id="legendSub" style="font-size:8px;color:var(--t3);margin-top:1px;margin-bottom:3px">LGA-level &middot; Sentinel-5P</div>
@@ -972,6 +983,27 @@
       <div id="landfillsUploadStatus" style="display:none;margin-top:8px;font-size:10px;padding:6px 8px;border-radius:6px"></div>
     </div>
 
+    <!-- Upload Places GeoJSON -->
+    <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:14px">
+      <div style="font-size:11px;font-weight:700;color:#818cf8;text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">Update Places</div>
+      <div style="font-size:10px;color:var(--t3);margin-bottom:10px;line-height:1.5">
+        Upload a GeoJSON FeatureCollection to replace the places / settlement labels layer.
+        Any geometry type is accepted.
+      </div>
+      <div style="display:flex;gap:6px">
+        <input type="file" id="placesInput" accept=".geojson,.json" style="display:none" onchange="app.uploadVector('places', this, 'placesStatus')">
+        <button onclick="document.getElementById('placesInput').click()"
+          style="flex:1;background:rgba(129,140,248,0.1);border:1px solid rgba(129,140,248,0.3);color:#818cf8;border-radius:7px;padding:9px;font-size:11px;font-weight:600;cursor:pointer">
+          Upload GeoJSON
+        </button>
+        <button onclick="app.downloadVector('places')" title="Download current file"
+          style="background:rgba(129,140,248,0.07);border:1px solid rgba(129,140,248,0.2);color:#818cf8;border-radius:7px;padding:9px 11px;font-size:11px;cursor:pointer">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        </button>
+      </div>
+      <div id="placesStatus" style="display:none;margin-top:8px;font-size:10px;padding:6px 8px;border-radius:6px"></div>
+    </div>
+
     <!-- User Management -->
     <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:14px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
@@ -1000,6 +1032,30 @@
 
   </div>
 </div>
+
+<!-- Mobile bottom navigation bar -->
+<nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="Mobile navigation">
+  <button class="mobile-nav-btn active" data-mob-section="dashboard" onclick="app.mobileNav(this,'dashboard')">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="12" width="4" height="9"/><rect x="10" y="7" width="4" height="14"/><rect x="17" y="3" width="4" height="18"/></svg>
+    Home
+  </button>
+  <button class="mobile-nav-btn" data-mob-section="analysis" onclick="app.mobileNav(this,'analysis')">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3,6 9,3 15,6 21,3 21,18 15,21 9,18 3,21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>
+    Spatial
+  </button>
+  <button class="mobile-nav-btn" data-mob-section="gas" onclick="app.mobileNav(this,'gas')">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/></svg>
+    Gas
+  </button>
+  <button class="mobile-nav-btn" data-mob-section="dumpsites" onclick="app.mobileNav(this,'dumpsites')">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+    Landfills
+  </button>
+  <button class="mobile-nav-btn" data-mob-section="info" onclick="app.toggleMobileInfoPanel()">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+    Stats
+  </button>
+</nav>
 
 <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
 

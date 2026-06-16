@@ -9,16 +9,21 @@ Default credentials:  admin / admin123   (change after first login)
 
 Endpoints
 ---------
-POST /api/auth/login                    — obtain token
-GET  /api/auth/me                       — current user (auth)
-GET  /api/emissions                     — lga_emissions.geojson  (auth)
-GET  /api/landfills                     — landfills.geojson      (auth)
-POST /api/admin/emissions/upload        — CSV → update emissions  (admin)
-POST /api/admin/landfills/upload        — GeoJSON → replace landfills (admin)
-GET  /api/admin/users                   — list users  (admin)
-POST /api/admin/users                   — create user (admin)
-PUT  /api/admin/users/<id>/password     — change password (admin)
-DELETE /api/admin/users/<id>            — delete user (admin)
+POST /api/auth/login                        — obtain token
+GET  /api/auth/me                           — current user (auth)
+GET  /api/emissions                         — lga_emissions.geojson  (auth)
+GET  /api/landfills                         — landfills.geojson      (auth)
+POST /api/admin/emissions/upload            — CSV → update emissions  (admin)
+POST /api/admin/landfills/upload            — GeoJSON → replace landfills (admin)
+GET  /api/admin/vectors/<name>              — download current vector GeoJSON (admin)
+POST /api/admin/vectors/<name>/upload       — GeoJSON → replace vector file  (admin)
+  <name> = places
+  (emission_points is generated from the CSV pipeline, not uploaded directly)
+  (lga_boundary is managed offline, not exposed through the UI)
+GET  /api/admin/users                       — list users  (admin)
+POST /api/admin/users                       — create user (admin)
+PUT  /api/admin/users/<id>/password         — change password (admin)
+DELETE /api/admin/users/<id>                — delete user (admin)
 """
 
 import os, json, sqlite3, csv, io, time, hmac, hashlib, base64, math
@@ -456,6 +461,73 @@ def upload_landfills():
         return jsonify({'error': 'Invalid JSON / GeoJSON file'}), 400
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+# ── Admin: generic vector file upload / download ──────────────────────────────
+
+# Maps URL slug → (filename, allowed geometry types or None for any).
+# emission_points.geojson is derived from the CSV pipeline — not uploaded directly.
+# lga_boundary.geojson is managed offline — not exposed for upload through the UI.
+_VECTOR_LAYERS = {
+    'places': ('places.geojson', None),
+}
+
+@app.route('/api/admin/vectors/<string:vname>')
+@require_admin
+def download_vector(vname):
+    if vname not in _VECTOR_LAYERS:
+        return jsonify({'error': f'Unknown layer "{vname}". Valid: {", ".join(_VECTOR_LAYERS)}'}), 404
+    filename, _ = _VECTOR_LAYERS[vname]
+    path = os.path.join(DATA_DIR, filename)
+    if not os.path.exists(path):
+        return jsonify({'error': f'{filename} does not exist on the server'}), 404
+    with open(path, encoding='utf-8') as f:
+        return jsonify(json.load(f))
+
+@app.route('/api/admin/vectors/<string:vname>/upload', methods=['POST'])
+@require_admin
+def upload_vector(vname):
+    if vname not in _VECTOR_LAYERS:
+        return jsonify({'error': f'Unknown layer "{vname}". Valid: {", ".join(_VECTOR_LAYERS)}'}), 404
+    filename, allowed_geom_types = _VECTOR_LAYERS[vname]
+
+    f = request.files.get('file')
+    if not f:
+        return jsonify({'error': 'No file attached (field name: "file")'}), 400
+    try:
+        gj = json.loads(f.read().decode('utf-8-sig'))
+    except (json.JSONDecodeError, UnicodeDecodeError) as e:
+        return jsonify({'error': f'Could not parse file as GeoJSON: {e}'}), 400
+
+    if gj.get('type') != 'FeatureCollection':
+        return jsonify({'error': 'File must be a GeoJSON FeatureCollection'}), 400
+    features = gj.get('features') or []
+    if not features:
+        return jsonify({'error': 'GeoJSON has no features'}), 400
+
+    if allowed_geom_types:
+        bad = [
+            i for i, feat in enumerate(features)
+            if (feat.get('geometry') or {}).get('type') not in allowed_geom_types
+        ]
+        if bad:
+            sample = bad[:5]
+            return jsonify({
+                'error': (
+                    f'Expected {" or ".join(allowed_geom_types)} geometries for "{vname}". '
+                    f'Invalid at feature indices: {sample}'
+                    + (' …' if len(bad) > 5 else '')
+                )
+            }), 400
+
+    backup_path = os.path.join(DATA_DIR, filename + '.bak')
+    existing = os.path.join(DATA_DIR, filename)
+    if os.path.exists(existing):
+        import shutil
+        shutil.copy2(existing, backup_path)
+
+    _save_geojson(gj, filename)
+    print(f'Vector updated: {filename} ({len(features)} features) by {g.user["u"]}')
+    return jsonify({'success': True, 'file': filename, 'count': len(features)})
 
 # ── Admin: user management ─────────────────────────────────────────────────────
 
