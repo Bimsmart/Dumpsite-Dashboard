@@ -9,8 +9,9 @@ The dashboard supports executive review through:
 - gas trend analytics,
 - point / transect / zonal spatial reporting,
 - comparative gas correlation analysis,
-- buffer exposure assessment, and
-- LGA-level performance ranking.
+- buffer exposure assessment,
+- LGA-level performance ranking, and
+- authenticated access with an admin panel for data updates and user management.
 
 This document summarizes the project purpose, data sources, functionality, operating workflow, and recommended next steps.
 
@@ -31,7 +32,7 @@ The dashboard covers:
 - environmental risk indexing, and
 - spatial overlay and buffer analysis.
 
-The solution is built for desktop browser use via HTTP server and is designed to be extensible for future data additions.
+The solution is built for browser use via HTTP server, with a responsive layout for both desktop and mobile, and is designed to be extensible for future data additions.
 
 ## Data Sources
 
@@ -44,14 +45,14 @@ The solution is built for desktop browser use via HTTP server and is designed to
 
 ### Files and Roles
 
-- `index.html` — primary interactive dashboard user interface.
-- `dashboard.html` — simplified alternative dashboard for basic mapping and analytics.
+- `index.html` — primary interactive dashboard user interface, including the login modal and admin panel.
 - `app.js` — core dashboard logic and feature implementation.
-- `prepare_dashboard_data.py` — Python preparation script for GeoJSON data export.
+- `style.css` — visual layout and theme styling, including the responsive/mobile layout.
+- `backend.py` — Flask API (port 5002) handling authentication, the emissions/landfills data endpoints, admin CSV/GeoJSON upload, and user management. Persists to `dashboard.db` (SQLite).
+- `server.py` — Flask API (port 5001) proxying live Google Earth Engine raster tiles, LGA/ward statistics, pixel lookups, and trend data.
+- `prepare_dashboard_data.py` / `convert_csvs.py` / `convert_landfills.py` — Python preparation scripts for GeoJSON data export from source shapefiles/CSVs.
 - `prepare_dashboard_data.js` — Node.js data preparation entrypoint used by `npm run prepare-data`.
-- `server.py` — optional local server integration for GEE-based raster and trend services.
-- `style.css` — visual layout and theme styling.
-- `data/` — GeoJSON datasets consumed by the dashboard.
+- `data/` — GeoJSON datasets consumed by the dashboard (emissions, landfills, LGA boundaries, places).
 
 ### Key Visualization Modules
 
@@ -61,6 +62,7 @@ The dashboard exposes the following major modules:
 - Spatial analysis panel
 - Gas emissions panel
 - Landfill status panel
+- Admin panel (data upload, user management) — visible to authenticated admin users
 - About / project context overlay
 
 ## Feature Summary
@@ -141,34 +143,67 @@ The spatial analysis panel supports:
 - zonal classification,
 - overlay analysis of emission and landfill data.
 
+### 9. Authentication and Admin Panel
+
+Access to the dashboard's data is gated by a login modal backed by `backend.py`:
+- Username/password login issues a signed token (default credentials `admin` / `admin123`, which should be changed after first login).
+- All users can view emissions/landfills data and change their own password.
+- Admin users additionally get an admin panel to:
+  - upload a CSV to update emissions data,
+  - upload GeoJSON to replace the landfills layer or the places/settlement labels layer,
+  - download the current version of any of the above vector files,
+  - create, list, and delete user accounts, and reset user passwords.
+
+### 10. Mobile-Responsive Layout
+
+On narrow viewports, the dashboard switches to a mobile-optimized layout:
+- a collapsible sidebar opened via a hamburger menu,
+- a bottom navigation bar for switching between Home, Spatial, Gas, Landfills, and Stats,
+- the right-hand info panel becomes a toggleable bottom sheet over the map.
+
 ## User Workflow
 
-1. Start a local server in the dashboard folder.
-2. Open `index.html` in the browser.
-3. Select the year and emission metric to review.
-4. Toggle map layers and basemaps to inspect spatial patterns.
-5. Use the LGA selector or search box for targeted review.
-6. Open the spatial analysis panel for ranking, trending, and anomaly review.
-7. Open the gas panel to compare gas pairs and observe temporal behavior.
-8. Draw a point / transect / zone or click an LGA to generate reports.
+1. Start the backend (`backend.py`) and, optionally, the GEE proxy (`server.py`).
+2. Start a local static server in the dashboard folder and open `index.html` in the browser.
+3. Log in (default `admin` / `admin123`, or a provisioned user account).
+4. Select the year and emission metric to review.
+5. Toggle map layers and basemaps to inspect spatial patterns.
+6. Use the LGA selector or search box for targeted review.
+7. Open the spatial analysis panel for ranking, trending, and anomaly review.
+8. Open the gas panel to compare gas pairs and observe temporal behavior.
+9. Draw a point / transect / zone or click an LGA to generate reports.
+10. Admin users can open the admin panel to refresh data or manage accounts.
 
 ## Deployment Instructions
 
 ### Prerequisites
 
 - Node.js installed for data preparation and optional static serving.
-- Python installed if using `prepare_dashboard_data.py` or the `python -m http.server` fallback.
+- Python installed for `backend.py`, `server.py`, and the data-preparation scripts (see `requirements.txt`).
 
 ### Install
 
 ```powershell
 npm install
+pip install -r requirements.txt
 ```
 
 ### Prepare Data
 
 ```powershell
 npm run prepare-data
+```
+
+### Start the Backend
+
+```powershell
+python backend.py
+```
+
+### Start the GEE Proxy (optional, for live raster/trend tiles)
+
+```powershell
+python server.py
 ```
 
 ### Serve Dashboard
@@ -186,13 +221,14 @@ python -m http.server 8000
 ### Open in Browser
 
 - `http://localhost:8000/index.html`
+- Log in with the default admin credentials (`admin` / `admin123`) and change the password from the admin panel.
 
 ## Technical Notes
 
-- The dashboard loads local GeoJSON files using browser `fetch()`, so HTTP serving is required.
-- `index.html` is the comprehensive application; `dashboard.html` is a lighter legacy view.
+- The dashboard loads emissions/landfills data and authenticates through `backend.py` (port 5002), and optionally fetches live raster tiles and trend details through `server.py` (port 5001).
+- `index.html` is the single, comprehensive application; the previously included `dashboard.html` legacy view has been removed.
 - The application is built with Leaflet for GIS mapping and Chart.js for analytics.
-- If a local Earth Engine service is available, the dashboard can additionally enable live GEE raster layers and trend details.
+- `dashboard.db` (SQLite) stores user accounts and tokens; it is created automatically on first run of `backend.py` and is not tracked in source control.
 
 ## Limitations
 
@@ -205,8 +241,7 @@ python -m http.server 8000
 For further executive-level use, the dashboard can be extended with:
 - automated PDF/PowerPoint report export,
 - additional socio-economic / population exposure layers,
-- mobile-friendly layout,
-- dashboard access control,
+- role-based permissions beyond the current admin/user split,
 - more fine-grained spatial units such as wards or communities.
 
 ## Contact

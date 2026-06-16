@@ -1,40 +1,47 @@
 # Lagos Dumpsite Gas Emissions Dashboard
 
-This project builds an interactive dashboard for Lagos State gas emissions using the current dataset.
+This project builds an interactive dashboard for Lagos State gas emissions and dumpsite risk using Sentinel-5P derived data.
 
 For a full executive-level overview, see `EXECUTIVE_DOCUMENTATION.md`.
 
 ## What is included
 
-- `prepare_dashboard_data.py`: Python script that joins LGA boundaries with yearly gas emission CSVs and exports GeoJSON files.
-- `dashboard.html`: Leaflet + Chart.js dashboard that displays LGA choropleth mapping and time-series charts.
-- `data/lga_emissions.geojson`: generated LGA-level emissions GeoJSON.
-- `data/emission_points.geojson`: measurement point GeoJSON generated from the CSV point coordinates.
+- `index.html` / `app.js` / `style.css` — the dashboard itself (Leaflet + Chart.js), including spatial analysis, gas trend panels, and an admin panel.
+- `backend.py` — Flask API (port 5002) providing authentication, the emissions/landfills data endpoints, and admin CSV/GeoJSON upload + user management. Stores users and tokens in `dashboard.db` (SQLite, not committed).
+- `server.py` — Flask API (port 5001) that proxies live Google Earth Engine raster tiles, LGA/ward stats, pixel lookups, and trend data.
+- `prepare_dashboard_data.py` / `prepare_dashboard_data.js` / `convert_csvs.py` / `convert_landfills.py` — data preparation scripts that turn source shapefiles/CSVs into the GeoJSON files under `data/`.
+- `data/`: generated GeoJSON datasets consumed by the dashboard (`lga_emissions.geojson`, `landfills.geojson`, `emission_points.geojson`, `lga_boundary.geojson`, `places.geojson`).
 
 ## How to use
 
-1. Install the required Node.js dependencies:
+1. Install dependencies:
 
 ```powershell
 npm install
+pip install -r requirements.txt
 ```
 
-2. Run the JavaScript data preparation script:
+2. (Optional) Regenerate the GeoJSON data from source files:
 
 ```powershell
 npm run prepare-data
 ```
 
-Output files will be written to the local `data/` folder:
+If you want to keep using Python instead, `prepare_dashboard_data.py`, `convert_csvs.py`, and `convert_landfills.py` still work and produce the same output files in `data/`.
+
+3. Start the backend API (auth, uploads, admin):
 
 ```powershell
-<data-folder>/data/lga_emissions.geojson
-<data-folder>/data/emission_points.geojson
+python backend.py
 ```
 
-If you want to keep using Python, the existing `prepare_dashboard_data.py` still works, but the dashboard itself is built in JavaScript.
+4. (Optional) Start the GEE proxy for live raster/trend tiles:
 
-3. Start a local web server in the dashboard folder:
+```powershell
+python server.py
+```
+
+5. Serve the dashboard's static files:
 
 ```powershell
 npm run serve
@@ -46,14 +53,17 @@ Or use Python if you prefer:
 python -m http.server 8000
 ```
 
-4. Open the dashboard in your browser:
+6. Open the dashboard in your browser:
 
 ```
-http://localhost:8000/dashboard.html
+http://localhost:8000/index.html
 ```
+
+Log in with the default admin credentials (`admin` / `admin123`) and change the password immediately via the admin panel.
 
 ## Notes
 
-- The dashboard uses browser `fetch()` to load local GeoJSON files from the `data/` folder, so it must be served through HTTP rather than opened directly as a file.
-- The visualization is built in JavaScript with Leaflet and Chart.js.
+- The dashboard talks to `backend.py` (port 5002) for emissions/landfills data, auth, and admin uploads, and optionally to `server.py` (port 5001) for live GEE tiles — both must be running for full functionality.
+- `dashboard.db` is created automatically by `backend.py` on first run and is intentionally untracked (see `.gitignore`).
+- The UI is responsive, with a dedicated mobile layout (collapsible sidebar, bottom nav, bottom-sheet info panel).
 - If you add ward boundaries, dumpsite locations, or population data later, the same dashboard structure can be extended.
