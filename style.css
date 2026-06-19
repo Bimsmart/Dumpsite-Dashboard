@@ -265,7 +265,7 @@ html, body { height:100%; font-family:'Inter',sans-serif; background:var(--bg); 
 .leaflet-popup-content-wrapper { background:var(--surface) !important; border:1px solid var(--border) !important; border-radius:var(--r-md) !important; box-shadow:var(--sh-lg) !important; color:var(--t1) !important; }
 .leaflet-popup-tip { background:var(--surface) !important; }
 .leaflet-popup-content { margin:10px 14px; font-size:12px; color:var(--t1); }
-.places-label { background:transparent !important; border:none !important; box-shadow:none !important; font-size:9px !important; font-weight:500 !important; color:#f5f5f0 !important; text-shadow:0 1px 2px rgba(0,0,0,0.8) !important; white-space:nowrap !important; }
+.places-label { background:transparent !important; border:none !important; box-shadow:none !important; font-size:9px !important; font-weight:500 !important; color:#f5f5f0 !important; text-shadow:-1px -1px 2px rgba(0,0,0,0.9),1px -1px 2px rgba(0,0,0,0.9),-1px 1px 2px rgba(0,0,0,0.9),1px 1px 2px rgba(0,0,0,0.9) !important; white-space:nowrap !important; }
 .places-label::before { display:none !important; }
 .leaflet-bar a { background:var(--surface) !important; border-color:var(--border) !important; color:var(--t1) !important; }
 .leaflet-bar a:hover { background:var(--surface-2) !important; color:var(--accent) !important; }
@@ -349,7 +349,14 @@ html, body { height:100%; font-family:'Inter',sans-serif; background:var(--bg); 
 
 /* ── Small desktop ≤1200px ── */
 @media (max-width:1200px) {
-  :root { --sidebar-w:180px; --charts-h:190px; }
+  :root { --sidebar-w:180px; --charts-h:200px; }
+}
+
+/* ── Narrow tablet 641–768px ── */
+@media (max-width:768px) and (min-width:641px) {
+  :root { --charts-h: 185px; }
+  .chart-hdr { padding: 5px 10px; }
+  .chart-hdr span { font-size: 9px; }
 }
 
 /* ── Tablet 641–900px ── */
@@ -458,12 +465,44 @@ html, body { height:100%; font-family:'Inter',sans-serif; background:var(--bg); 
     z-index: 1050 !important;
   }
 
-  /* ── Bottom charts: hidden ── */
-  .bottom-row { display: none !important; }
+  /* ── Bottom charts: swipeable horizontal carousel ── */
+  .bottom-row {
+    display: flex !important;
+    flex-direction: column;
+    height: calc(180px + var(--mob-nav-h));
+    padding-bottom: var(--mob-nav-h);
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+  .charts-row {
+    display: flex !important;
+    flex-direction: row;
+    height: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .charts-row::-webkit-scrollbar { display: none; }
+  .chart-card {
+    flex: 0 0 calc(100vw - 16px);
+    min-width: 0;
+    scroll-snap-align: start;
+    height: 100%;
+    border-right: 1px solid var(--border);
+  }
+  .chart-hdr span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: calc(100% - 32px);
+  }
 
-  /* ── Map legend: compact, keep clear of bottom nav ── */
+  /* ── Map legend: compact — map bottom is now above chart row, not above mob nav ── */
   .map-legend {
-    bottom: calc(var(--mob-nav-h) + 8px);
+    bottom: 10px;
     left: 8px;
     max-width: min(220px, calc(100vw - 16px));
     padding: 10px 12px;
@@ -471,16 +510,16 @@ html, body { height:100%; font-family:'Inter',sans-serif; background:var(--bg); 
   }
   .buffer-legend {
     left: 8px;
-    bottom: calc(var(--mob-nav-h) + 8px);
+    bottom: 10px;
     min-width: 130px;
   }
 
-  /* ── Leaflet controls: above bottom nav ── */
-  .leaflet-bottom { bottom: var(--mob-nav-h) !important; }
+  /* ── Leaflet controls: clear of the chart row ── */
+  .leaflet-bottom { bottom: 8px !important; }
 
-  /* ── Draw results: float above bottom nav ── */
+  /* ── Draw results: float above chart row ── */
   #drawResultsSection {
-    bottom: calc(var(--mob-nav-h) + 8px) !important;
+    bottom: 10px !important;
     left: 8px !important;
     right: 8px !important;
     width: auto !important;
@@ -488,7 +527,7 @@ html, body { height:100%; font-family:'Inter',sans-serif; background:var(--bg); 
   }
 
   /* ── Map tip ── */
-  .map-tip { bottom: calc(var(--mob-nav-h) + 10px); font-size: 9px; }
+  .map-tip { bottom: 12px; font-size: 9px; }
 }
 
 /* ── Flat SVG icon sizing ────────────────────────────── */
@@ -1232,7 +1271,7 @@ html, body { height:100%; font-family:'Inter',sans-serif; background:var(--bg); 
   border: none !important;
   box-shadow: none !important;
   font-family: 'Inter', sans-serif;
-  font-size: 7px;
+  font-size: 10px;
   font-weight: 700;
   color: #fff;
   text-shadow:
