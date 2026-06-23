@@ -43,7 +43,7 @@ def init_ee():
     print(f'Using key: {key_path}')
     credentials = ee.ServiceAccountCredentials(SERVICE_ACCOUNT, key_path)
     ee.Initialize(credentials, opt_url='https://earthengine.googleapis.com')
-    print('✅ GEE authenticated')
+    print('[OK] GEE authenticated')
 
 init_ee()
 
@@ -280,7 +280,7 @@ def get_tiles(metric, year):
         map_id = img.getMapId(VIS[metric])
         url    = get_tile_url(map_id)
         _cache[key] = url
-        print(f'✅ Tiles: {metric}/{year}')
+        print(f'[OK] Tiles: {metric}/{year}')
         return jsonify({'url':url})
     except Exception as e:
         print(f'❌ {e}')
@@ -371,7 +371,7 @@ def get_lga_stats(year):
             })
 
         _lga_cache[year] = features
-        print(f'✅ LGA stats: {year} ({len(features)} LGAs)')
+        print(f'[OK] LGA stats: {year} ({len(features)} LGAs)')
         return jsonify(features)
     except Exception as e:
         print(f'❌ LGA stats {year}: {e}')
@@ -453,7 +453,7 @@ def get_ward_stats(year):
             })
 
         _ward_cache[year] = features
-        print(f'✅ Ward stats: {year} ({len(features)} wards)')
+        print(f'[OK] Ward stats: {year} ({len(features)} wards)')
         return jsonify(features)
     except Exception as e:
         print(f'❌ Ward stats {year}: {e}')
