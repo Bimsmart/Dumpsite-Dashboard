@@ -50,6 +50,8 @@ const app = {
     gasTemporal: null,
     gasCorrelation: null,
     transect: null,
+    drawTrend: null,
+    drawDonut: null,
   },
   layers: {
     basemap: null,
@@ -826,6 +828,25 @@ const app = {
 
     legendContent.appendChild(catSection);
 
+  },
+
+  toggleLegend() {
+    const legend = document.getElementById('mapLegend');
+    if (!legend) return;
+    const isMobile = window.innerWidth <= 640;
+    if (isMobile) {
+      legend.classList.toggle('mobile-expanded');
+    } else {
+      legend.classList.toggle('collapsed');
+    }
+  },
+
+  updateLegendVisibility() {
+    const legend = document.getElementById('mapLegend');
+    if (!legend) return;
+    const panelOpen = ['saPanel','gasPanel','landfillsPanel','adminPanel']
+      .some(id => document.getElementById(id)?.classList.contains('open'));
+    legend.classList.toggle('panel-hidden', panelOpen);
   },
 
   // Update analytics panel
@@ -1643,6 +1664,7 @@ const app = {
     const panel = document.getElementById('saPanel');
     if (panel) {
       panel.classList.add('open');
+      this.updateLegendVisibility();
       const mapTip = document.querySelector('.map-tip'); if (mapTip) mapTip.style.display = 'none';
       this.closeGas();
       this.renderSATab('rankings');
@@ -1661,6 +1683,7 @@ const app = {
   },
   closeSpatialAnalysis() {
     document.getElementById('saPanel')?.classList.remove('open');
+    this.updateLegendVisibility();
     if (!document.getElementById('gasPanel')?.classList.contains('open') &&
         !document.getElementById('landfillsPanel')?.classList.contains('open')) {
       const mapTip = document.querySelector('.map-tip'); if (mapTip) mapTip.style.display = 'block';
@@ -2005,12 +2028,14 @@ const app = {
     const panel = document.getElementById('gasPanel');
     if (panel) {
       panel.classList.add('open');
+      this.updateLegendVisibility();
       const mapTip = document.querySelector('.map-tip'); if (mapTip) mapTip.style.display = 'none';
       this.renderGasTemporal();
     }
   },
   closeGas() {
     document.getElementById('gasPanel')?.classList.remove('open');
+    this.updateLegendVisibility();
     if (!document.getElementById('saPanel')?.classList.contains('open') &&
         !document.getElementById('landfillsPanel')?.classList.contains('open')) {
       const mapTip = document.querySelector('.map-tip'); if (mapTip) mapTip.style.display = 'block';
@@ -3217,11 +3242,13 @@ const app = {
     const p = document.getElementById('landfillsPanel');
     if (p) {
       p.classList.add('open'); this.renderLandfillsPanel();
+      this.updateLegendVisibility();
       const mapTip = document.querySelector('.map-tip'); if (mapTip) mapTip.style.display = 'none';
     }
   },
   closeLandfills() {
     document.getElementById('landfillsPanel')?.classList.remove('open');
+    this.updateLegendVisibility();
     if (!document.getElementById('saPanel')?.classList.contains('open') &&
         !document.getElementById('gasPanel')?.classList.contains('open')) {
       const mapTip = document.querySelector('.map-tip'); if (mapTip) mapTip.style.display = 'block';
@@ -4447,11 +4474,12 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
         </div>
       `).openPopup();
 
-      this.state.currentDrawContext = {
+      const ctx = {
         type: 'point', title: 'Point Analysis', year, lat, lng,
         vals: { ch4: vals.ch4 || 0, no2: vals.no2 || 0, co: vals.co || 0, isi: vals.isi || 0 },
         risk, label: `${lat.toFixed(5)}°N, ${lng.toFixed(5)}°E`,
       };
+      this.state.currentDrawContext = ctx;
       this.showDrawResults('Point Analysis', `
         <div class="draw-point-grid">
           <div class="draw-stat-box ch4"><div class="draw-gas-sym">CH₄</div><div class="draw-gas-val">${(vals.ch4||0).toFixed(5)}</div><div class="draw-gas-unit">mol/m²</div></div>
@@ -4464,6 +4492,7 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
           <span class="sa-badge ${risk.css}" style="font-size:8px">${risk.label}</span>
         </div>
       `);
+      this.renderDrawMiniCharts('point', ctx);
     } catch(err) {
       this.showDrawResults('Point Analysis',
         `<div style="color:var(--red);font-size:11px;padding:6px 0">${err.message}</div>`);
@@ -4665,6 +4694,7 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
     // newly-shown drawTransectWrap, causing clientHeight to read as 0 and the
     // dimension-check loop inside renderTransectChart to spin forever.
     setTimeout(renderTransectChart, 0);
+    this.renderDrawMiniCharts('transect', this.state.currentDrawContext);
   },
 
   // ── Zone ─────────────────────────────────────────────────────
@@ -4731,11 +4761,12 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
         ? `<div style="font-size:9px;color:var(--t3);margin-top:6px">
              ${lgaNames.length} LGA${lgaNames.length > 1 ? 's' : ''}: ${lgaNames.slice(0,4).join(', ')}${lgaNames.length > 4 ? '…' : ''}
            </div>` : '';
-      this.state.currentDrawContext = {
+      const zoneCtx = {
         type: 'zone', title: 'Zone Analysis', year, areaKm2, source, stats, lgaNames,
         lgaDetails: Array.isArray(stats._lgas) ? stats._lgas : [],
         polygonCoords: coords,
       };
+      this.state.currentDrawContext = zoneCtx;
       this.showDrawResults('Zone Analysis', `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
           <span style="font-size:10px;color:var(--t2)">~${areaKm2} km² · ${year}</span>
@@ -4753,6 +4784,7 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
         </table>
         ${lgaNote}
       `);
+      this.renderDrawMiniCharts('zone', zoneCtx);
     } catch(err) {
       this.showDrawResults('Zone Analysis',
         `<div style="color:var(--red);font-size:11px;padding:6px 0">${err.message}</div>`);
@@ -4913,17 +4945,158 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
     });
   },
 
+  async renderDrawMiniCharts(type, context) {
+    const miniWrap = document.getElementById('drawMiniChartsWrap');
+    const trendCanvas = document.getElementById('drawTrendChart');
+    const donutCanvas = document.getElementById('drawDonutChart');
+    if (!miniWrap || !trendCanvas || !donutCanvas) return;
+
+    if (this.charts.drawTrend) { this.charts.drawTrend.destroy(); this.charts.drawTrend = null; }
+    if (this.charts.drawDonut) { this.charts.drawDonut.destroy(); this.charts.drawDonut = null; }
+    miniWrap.style.display = 'block';
+
+    const years  = this.state.availableYears;
+    const GAS_COLORS = { ch4: '#3b82f6', no2: '#10b981', co: '#f59e0b' };
+    const GAS_LABELS = { ch4: 'CH₄',    no2: 'NO₂',    co: 'CO'  };
+
+    const makeChartOptions = () => ({
+      responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: { legend: { labels: { font:{size:9}, color:'#7a8fa8', boxWidth:10, padding:6 } } },
+      scales: {
+        x: { ticks:{font:{size:8}, color:'#7a8fa8', maxRotation:0}, grid:{color:'rgba(255,255,255,0.04)'} },
+        y: { ticks:{font:{size:8}, color:'#7a8fa8'}, grid:{color:'rgba(255,255,255,0.04)'} },
+      },
+    });
+
+    const makeTrendDatasets = (data) =>
+      ['ch4','no2','co'].map(g => ({
+        label: GAS_LABELS[g],
+        data: data[g],
+        borderColor: GAS_COLORS[g], backgroundColor: GAS_COLORS[g] + '18',
+        borderWidth: 1.5, tension: 0.4, pointRadius: 2, fill: true, spanGaps: true,
+      }));
+
+    const makeDonut = (ch4, no2, co) => {
+      if (this.charts.drawDonut) { this.charts.drawDonut.destroy(); this.charts.drawDonut = null; }
+      this.charts.drawDonut = new Chart(donutCanvas, {
+        type: 'doughnut',
+        data: {
+          labels: ['CH₄', 'NO₂', 'CO'],
+          datasets: [{ data: [ch4, no2, co], backgroundColor: ['#3b82f6','#10b981','#f59e0b'], borderWidth: 0 }],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false, animation: false, cutout: '60%',
+          plugins: { legend: { position:'right', labels:{font:{size:9}, color:'#7a8fa8', boxWidth:10, padding:6} } },
+        },
+      });
+    };
+
+    const readPixel = (gr, lat, lng) => {
+      if (!gr) return null;
+      const col = Math.floor((lng - gr.xmin) / gr.pixelWidth);
+      const row = Math.floor((gr.ymax - lat) / gr.pixelHeight);
+      if (row < 0 || row >= gr.height || col < 0 || col >= gr.width) return null;
+      const ch4Raw = gr.values[0]?.[row]?.[col];
+      const no2Raw = gr.values[1]?.[row]?.[col];
+      const coRaw  = gr.values[2]?.[row]?.[col];
+      const ok = v => v != null && !isNaN(v) && v > -9000;
+      return {
+        ch4: ok(ch4Raw) ? Math.max(0, ch4Raw * this.CH4_PPB_TO_MOL) : null,
+        no2: ok(no2Raw) ? Math.max(0, no2Raw) : null,
+        co:  ok(coRaw)  ? Math.max(0, coRaw)  : null,
+      };
+    };
+
+    if (type === 'point') {
+      const { lat, lng, vals } = context;
+      const trendData = { ch4:[], no2:[], co:[] };
+      for (const yr of years) {
+        const gr = await this.loadRaster(yr);
+        const px = readPixel(gr, lat, lng);
+        trendData.ch4.push(px?.ch4 ?? null);
+        trendData.no2.push(px?.no2 ?? null);
+        trendData.co.push(px?.co  ?? null);
+      }
+      this.charts.drawTrend = new Chart(trendCanvas, {
+        type: 'line',
+        data: { labels: years, datasets: makeTrendDatasets(trendData) },
+        options: makeChartOptions(),
+      });
+      makeDonut(vals.ch4 || 0, vals.no2 || 0, vals.co || 0);
+
+    } else if (type === 'zone') {
+      const { polygonCoords, stats } = context;
+      const trendData = { ch4:[], no2:[], co:[] };
+      for (const yr of years) {
+        try {
+          const s = this.computeLGAZoneStats(polygonCoords, parseInt(yr));
+          trendData.ch4.push(s.ch4?.mean ?? null);
+          trendData.no2.push(s.no2?.mean ?? null);
+          trendData.co.push(s.co?.mean  ?? null);
+        } catch { trendData.ch4.push(null); trendData.no2.push(null); trendData.co.push(null); }
+      }
+      this.charts.drawTrend = new Chart(trendCanvas, {
+        type: 'line',
+        data: { labels: years, datasets: makeTrendDatasets(trendData) },
+        options: makeChartOptions(),
+      });
+      makeDonut(stats.ch4?.mean || 0, stats.no2?.mean || 0, stats.co?.mean || 0);
+
+    } else if (type === 'transect') {
+      const { latlngs } = context;
+      const samples = this.samplePolyline(latlngs, 12);
+      const trendData = { ch4:[], no2:[], co:[] };
+      for (const yr of years) {
+        const gr = await this.loadRaster(yr);
+        const sums = {ch4:0,no2:0,co:0}, counts = {ch4:0,no2:0,co:0};
+        samples.forEach(s => {
+          const px = readPixel(gr, s.latlng.lat, s.latlng.lng);
+          if (!px) return;
+          if (px.ch4 != null) { sums.ch4 += px.ch4; counts.ch4++; }
+          if (px.no2 != null) { sums.no2 += px.no2; counts.no2++; }
+          if (px.co  != null) { sums.co  += px.co;  counts.co++;  }
+        });
+        trendData.ch4.push(counts.ch4 ? sums.ch4/counts.ch4 : null);
+        trendData.no2.push(counts.no2 ? sums.no2/counts.no2 : null);
+        trendData.co.push(counts.co  ? sums.co /counts.co  : null);
+      }
+      this.charts.drawTrend = new Chart(trendCanvas, {
+        type: 'line',
+        data: { labels: years, datasets: makeTrendDatasets(trendData) },
+        options: makeChartOptions(),
+      });
+      // Donut from current year mean along path
+      const grNow = await this.loadRaster(this.state.currentYear);
+      let ch4s=0,no2s=0,cos=0,n=0;
+      samples.forEach(s => {
+        const px = readPixel(grNow, s.latlng.lat, s.latlng.lng);
+        if (!px) return;
+        if (px.ch4 != null) ch4s += px.ch4;
+        if (px.no2 != null) no2s += px.no2;
+        if (px.co  != null) cos  += px.co;
+        n++;
+      });
+      makeDonut(n ? ch4s/n : 0, n ? no2s/n : 0, n ? cos/n : 0);
+    }
+  },
+
   showDrawResults(title, html, keepChart = false) {
     const section      = document.getElementById('drawResultsSection');
     const titleEl      = document.getElementById('drawResultsTitle');
     const contentEl    = document.getElementById('drawResultsContent');
     const transectWrap = document.getElementById('drawTransectWrap');
+    const miniWrap     = document.getElementById('drawMiniChartsWrap');
     if (!section) return;
     if (titleEl)   titleEl.textContent = title;
     if (contentEl) contentEl.innerHTML = html;
     if (!keepChart && transectWrap) {
       transectWrap.style.display = 'none';
       if (this.charts.transect) { this.charts.transect.destroy(); this.charts.transect = null; }
+    }
+    if (!keepChart) {
+      if (miniWrap) miniWrap.style.display = 'none';
+      if (this.charts.drawTrend) { this.charts.drawTrend.destroy(); this.charts.drawTrend = null; }
+      if (this.charts.drawDonut) { this.charts.drawDonut.destroy(); this.charts.drawDonut = null; }
     }
     section.style.display = 'block';
   },
@@ -4938,7 +5111,11 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
     document.querySelectorAll('.draw-btn').forEach(b => b.classList.remove('active'));
     const section = document.getElementById('drawResultsSection');
     if (section) section.style.display = 'none';
+    const miniWrap = document.getElementById('drawMiniChartsWrap');
+    if (miniWrap) miniWrap.style.display = 'none';
     if (this.charts.transect) { this.charts.transect.destroy(); this.charts.transect = null; }
+    if (this.charts.drawTrend) { this.charts.drawTrend.destroy(); this.charts.drawTrend = null; }
+    if (this.charts.drawDonut) { this.charts.drawDonut.destroy(); this.charts.drawDonut = null; }
     if (this._profileCursor) { this.map.removeLayer(this._profileCursor); this._profileCursor = null; }
     this._profileCursorSamples = null;
   },
@@ -5236,11 +5413,13 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
 
   openAdminPanel() {
     document.getElementById('adminPanel')?.classList.add('open');
+    this.updateLegendVisibility();
     this.loadAdminUsers();
   },
 
   closeAdminPanel() {
     document.getElementById('adminPanel')?.classList.remove('open');
+    this.updateLegendVisibility();
   },
 
   _adminStatusEl(id, msg, ok) {

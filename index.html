@@ -227,9 +227,14 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
         </button>
         <div id="mapLegend" class="map-legend">
-          <strong id="legendTitle">Methane (CH&#8324;)</strong>
-          <div id="legendSub" style="font-size:8px;color:var(--t3);margin-top:1px;margin-bottom:3px">LGA-level &middot; Sentinel-5P</div>
-          <div id="legendContent"></div>
+          <div class="legend-header">
+            <strong id="legendTitle">Methane (CH&#8324;)</strong>
+            <button class="legend-toggle-btn" id="legendToggleBtn" onclick="app.toggleLegend()" title="Collapse legend">&#9660;</button>
+          </div>
+          <div id="legendBody">
+            <div id="legendSub" style="font-size:8px;color:var(--t3);margin-top:1px;margin-bottom:3px">LGA-level &middot; Sentinel-5P</div>
+            <div id="legendContent"></div>
+          </div>
         </div>
         <div class="map-tip">Click an LGA to inspect emissions</div>
         <div class="buffer-legend" id="bufferLegend" style="display:none">
@@ -254,6 +259,17 @@
           <div id="drawTransectWrap" style="display:none;margin-top:8px;border:1px solid var(--border);border-radius:var(--r-md);padding:8px;background:var(--surface-2)">
             <div style="position:relative;height:130px">
               <canvas id="drawTransectChart"></canvas>
+            </div>
+          </div>
+          <!-- Mini trend + donut charts for point / line / polygon results -->
+          <div id="drawMiniChartsWrap" style="display:none;margin-top:10px">
+            <div class="draw-mini-section-title">Year Trend</div>
+            <div style="position:relative;height:110px;margin-bottom:10px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-md);padding:6px">
+              <canvas id="drawTrendChart"></canvas>
+            </div>
+            <div class="draw-mini-section-title">Gas Composition</div>
+            <div style="position:relative;height:110px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-md);padding:6px">
+              <canvas id="drawDonutChart"></canvas>
             </div>
           </div>
         </div>
