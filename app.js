@@ -50,8 +50,6 @@ const app = {
     gasTemporal: null,
     gasCorrelation: null,
     transect: null,
-    drawTrend: null,
-    drawDonut: null,
   },
   layers: {
     basemap: null,
@@ -4171,6 +4169,34 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
     const riskColors = { low:'#16a34a', moderate:'#ca8a04', elevated:'#f97316', high:'#dc2626', critical:'#7c2d12' };
     const riskColor  = riskColors[ctx.risk.css] || '#888';
 
+    // Pre-compute year trend by sampling the raster pixel for each year
+    const years = this.state.availableYears;
+    const trendData = { ch4:[], no2:[], co:[] };
+    const readPixel = (gr, lat, lng) => {
+      if (!gr) return null;
+      const col = Math.floor((lng - gr.xmin) / gr.pixelWidth);
+      const row = Math.floor((gr.ymax - lat) / gr.pixelHeight);
+      if (row < 0 || row >= gr.height || col < 0 || col >= gr.width) return null;
+      const ok = v => v != null && !isNaN(v) && v > -9000;
+      const ch4R = gr.values[0]?.[row]?.[col];
+      const no2R = gr.values[1]?.[row]?.[col];
+      const coR  = gr.values[2]?.[row]?.[col];
+      return {
+        ch4: ok(ch4R) ? Math.max(0, ch4R * this.CH4_PPB_TO_MOL) : null,
+        no2: ok(no2R) ? Math.max(0, no2R) : null,
+        co:  ok(coR)  ? Math.max(0, coR)  : null,
+      };
+    };
+    for (const yr of years) {
+      try {
+        const gr = await this.loadRaster(yr);
+        const px = readPixel(gr, ctx.lat, ctx.lng);
+        trendData.ch4.push(px?.ch4 ?? null);
+        trendData.no2.push(px?.no2 ?? null);
+        trendData.co.push(px?.co   ?? null);
+      } catch { trendData.ch4.push(null); trendData.no2.push(null); trendData.co.push(null); }
+    }
+
     const [logoBase64, mapImg] = await Promise.all([
       this._loadLogoBase64(),
       (ctx.lat != null && ctx.lng != null)
@@ -4196,9 +4222,37 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
         <div class="kb"><div class="kl">CO</div><div class="kv">${ctx.vals.co.toFixed(6)}</div><div class="ku">mol/m²</div></div>
         <div class="kb"><div class="kl">ISI</div><div class="kv">${ctx.vals.isi.toFixed(4)}</div><div class="ku">Index</div></div>
       </div>
+      <div style="margin-top:18px;font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Year-over-Year Gas Trend</div>
+      <div class="chart-wrap" style="height:240px"><canvas id="ptTrendChart"></canvas></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:18px;align-items:center">
+        <div>
+          <div style="font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Gas Composition (${ctx.year})</div>
+          <div class="chart-wrap" style="height:180px"><canvas id="ptDonutChart"></canvas></div>
+        </div>
+        <div style="font-size:10px;color:#64748b;line-height:1.7">
+          <div><span style="color:#3b82f6;font-weight:700">CH₄</span> ${ctx.vals.ch4.toFixed(6)} mol/m²</div>
+          <div><span style="color:#10b981;font-weight:700">NO₂</span> ${ctx.vals.no2.toFixed(6)} mol/m²</div>
+          <div><span style="color:#f59e0b;font-weight:700">CO</span>&nbsp; ${ctx.vals.co.toFixed(6)} mol/m²</div>
+          <div style="margin-top:8px;font-size:9px;color:#94a3b8">ISI: ${ctx.vals.isi.toFixed(4)}</div>
+        </div>
+      </div>
     `;
-    const html = this.buildReportPage(ctx.title, `Study area: ${ctx.label} · Year: ${ctx.year} · ${date}`, body, '', logoBase64);
-    const win = window.open('','_blank','width=860,height=820');
+    const scripts = `<script>
+      (function(){
+        const yrs=${JSON.stringify(years)};
+        const td=${JSON.stringify(trendData)};
+        const tctx=document.getElementById('ptTrendChart').getContext('2d');
+        new Chart(tctx,{type:'line',data:{labels:yrs,datasets:[
+          {label:'CH₄',data:td.ch4,borderColor:'#3b82f6',backgroundColor:'#3b82f618',borderWidth:2,tension:0.4,pointRadius:3,fill:true,spanGaps:true},
+          {label:'NO₂',data:td.no2,borderColor:'#10b981',backgroundColor:'#10b98118',borderWidth:2,tension:0.4,pointRadius:3,fill:true,spanGaps:true},
+          {label:'CO',data:td.co,borderColor:'#f59e0b',backgroundColor:'#f59e0b18',borderWidth:2,tension:0.4,pointRadius:3,fill:true,spanGaps:true}
+        ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{font:{size:10},color:'#64748b'}}},scales:{x:{ticks:{color:'#94a3b8',font:{size:9}}},y:{ticks:{color:'#94a3b8',font:{size:9}},title:{display:true,text:'mol/m²',font:{size:9},color:'#94a3b8'}}}}});
+        const dctx=document.getElementById('ptDonutChart').getContext('2d');
+        new Chart(dctx,{type:'doughnut',data:{labels:['CH₄','NO₂','CO'],datasets:[{data:[${ctx.vals.ch4},${ctx.vals.no2},${ctx.vals.co}],backgroundColor:['#3b82f6','#10b981','#f59e0b'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'62%',plugins:{legend:{position:'bottom',labels:{font:{size:9},color:'#64748b',boxWidth:10,padding:8}}}}});
+      })();
+    <\/script>`;
+    const html = this.buildReportPage(ctx.title, `Study area: ${ctx.label} · Year: ${ctx.year} · ${date}`, body, scripts, logoBase64);
+    const win = window.open('','_blank','width=860,height=920');
     if (!win) return;
     win.document.write(html);
     win.document.close();
@@ -4212,10 +4266,51 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
     const max         = values.length ? Math.max(...values).toFixed(6) : 'N/A';
     const totalDist   = ctx.totalDist ? (ctx.totalDist / 1000).toFixed(2) : '0.00';
 
-    // Capture map with the transect path drawn on it
+    // Pre-compute year trend by sampling multi-band raster along path per year
+    const years = this.state.availableYears;
     const pathLatLngs = ctx.sampleLatLngs?.length ? ctx.sampleLatLngs
                       : ctx.latlngs?.length       ? ctx.latlngs
                       : [];
+    const samples = pathLatLngs.length >= 2 ? this.samplePolyline(pathLatLngs, 12) : [];
+    const readPixelMulti = (gr, lat, lng) => {
+      if (!gr) return null;
+      const col = Math.floor((lng - gr.xmin) / gr.pixelWidth);
+      const row = Math.floor((gr.ymax - lat) / gr.pixelHeight);
+      if (row < 0 || row >= gr.height || col < 0 || col >= gr.width) return null;
+      const ok = v => v != null && !isNaN(v) && v > -9000;
+      const ch4R = gr.values[0]?.[row]?.[col];
+      const no2R = gr.values[1]?.[row]?.[col];
+      const coR  = gr.values[2]?.[row]?.[col];
+      return {
+        ch4: ok(ch4R) ? Math.max(0, ch4R * this.CH4_PPB_TO_MOL) : null,
+        no2: ok(no2R) ? Math.max(0, no2R) : null,
+        co:  ok(coR)  ? Math.max(0, coR)  : null,
+      };
+    };
+    const trendData = { ch4:[], no2:[], co:[] };
+    let donutCh4 = 0, donutNo2 = 0, donutCo = 0;
+    for (const yr of years) {
+      try {
+        const gr = await this.loadRaster(yr);
+        const sums = {ch4:0,no2:0,co:0}, counts = {ch4:0,no2:0,co:0};
+        samples.forEach(s => {
+          const px = readPixelMulti(gr, s.latlng.lat, s.latlng.lng);
+          if (!px) return;
+          if (px.ch4 != null) { sums.ch4 += px.ch4; counts.ch4++; }
+          if (px.no2 != null) { sums.no2 += px.no2; counts.no2++; }
+          if (px.co  != null) { sums.co  += px.co;  counts.co++;  }
+        });
+        trendData.ch4.push(counts.ch4 ? sums.ch4/counts.ch4 : null);
+        trendData.no2.push(counts.no2 ? sums.no2/counts.no2 : null);
+        trendData.co.push(counts.co  ? sums.co /counts.co  : null);
+        if (yr === ctx.year || yr === String(ctx.year)) {
+          donutCh4 = counts.ch4 ? sums.ch4/counts.ch4 : 0;
+          donutNo2 = counts.no2 ? sums.no2/counts.no2 : 0;
+          donutCo  = counts.co  ? sums.co /counts.co  : 0;
+        }
+      } catch { trendData.ch4.push(null); trendData.no2.push(null); trendData.co.push(null); }
+    }
+
     const [logoBase64, mapImg] = await Promise.all([
       this._loadLogoBase64(),
       pathLatLngs.length >= 2
@@ -4238,17 +4333,42 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
       </div>
       ${mapImg ? `<div class="report-map"><img src="${mapImg}" alt="Transect path on map"/><p style="font-size:10px;color:#94a3b8;margin-top:6px;text-align:center">● Start &nbsp;&nbsp; ● End &nbsp;—&nbsp; Transect path</p></div>` : ''}
       <div style="margin-top:12px;font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Emission Profile Along Transect</div>
-      <div class="chart-wrap" style="height:280px"><canvas id="transectChart"></canvas></div>
+      <div class="chart-wrap" style="height:260px"><canvas id="transectChart"></canvas></div>
       <div style="margin-top:14px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
         <div class="kb"><div class="kl">Mean</div><div class="kv" style="font-size:13px">${mean}</div><div class="ku">mol/m²</div></div>
         <div class="kb"><div class="kl">Min</div><div class="kv" style="font-size:13px;color:#16a34a">${min}</div><div class="ku">mol/m²</div></div>
         <div class="kb"><div class="kl">Max</div><div class="kv" style="font-size:13px;color:#dc2626">${max}</div><div class="ku">mol/m²</div></div>
       </div>
-      ${tableRows ? `<div style="margin-top:14px"><div style="font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px">Sample Values (selected)</div><table><thead><tr><th>Distance</th><th>${ctx.mLabel} (mol/m²)</th></tr></thead><tbody>${tableRows}</tbody></table></div>` : ''}
+      <div style="margin-top:18px;font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Year-over-Year Gas Trend (Mean Along Path)</div>
+      <div class="chart-wrap" style="height:230px"><canvas id="trYearChart"></canvas></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:18px;align-items:center">
+        <div>
+          <div style="font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Gas Composition (${ctx.year})</div>
+          <div class="chart-wrap" style="height:170px"><canvas id="trDonutChart"></canvas></div>
+        </div>
+        <div>
+          ${tableRows ? `<div style="font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px">Sample Values (selected)</div><table><thead><tr><th>Distance</th><th>${ctx.mLabel} (mol/m²)</th></tr></thead><tbody>${tableRows}</tbody></table>` : ''}
+        </div>
+      </div>
     `;
-    const scripts = `<script>const ctxc=document.getElementById('transectChart').getContext('2d');new Chart(ctxc,{type:'line',data:{labels:${JSON.stringify(ctx.results.map(r=>(r.distance/1000).toFixed(2)))},datasets:[{label:'${ctx.mLabel} (mol/m²)',data:${JSON.stringify(ctx.results.map(r=>r.value))},borderColor:'${ctx.mColor}',backgroundColor:'${ctx.mColor}22',fill:true,pointRadius:2,borderWidth:2.5,tension:0.35,spanGaps:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{title:c=>\`\${c[0].label} km\`,label:c=>\`${ctx.mLabel}: \${c.raw!=null?c.raw.toFixed(6):'N/A'}\`}}},scales:{x:{title:{display:true,text:'Distance (km)',font:{size:11}},ticks:{maxTicksLimit:10}},y:{title:{display:true,text:'${ctx.mLabel} (mol/m²)',font:{size:11}},beginAtZero:false}}}});<\/script>`;
+    const scripts = `<script>
+      (function(){
+        const ctxc=document.getElementById('transectChart').getContext('2d');
+        new Chart(ctxc,{type:'line',data:{labels:${JSON.stringify(ctx.results.map(r=>(r.distance/1000).toFixed(2)))},datasets:[{label:'${ctx.mLabel} (mol/m²)',data:${JSON.stringify(ctx.results.map(r=>r.value))},borderColor:'${ctx.mColor}',backgroundColor:'${ctx.mColor}22',fill:true,pointRadius:2,borderWidth:2.5,tension:0.35,spanGaps:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{title:c=>\`\${c[0].label} km\`,label:c=>\`${ctx.mLabel}: \${c.raw!=null?c.raw.toFixed(6):'N/A'}\`}}},scales:{x:{title:{display:true,text:'Distance (km)',font:{size:11}},ticks:{maxTicksLimit:10}},y:{title:{display:true,text:'${ctx.mLabel} (mol/m²)',font:{size:11}},beginAtZero:false}}}});
+        const yrs=${JSON.stringify(years)};
+        const td=${JSON.stringify(trendData)};
+        const yctx=document.getElementById('trYearChart').getContext('2d');
+        new Chart(yctx,{type:'line',data:{labels:yrs,datasets:[
+          {label:'CH₄',data:td.ch4,borderColor:'#3b82f6',backgroundColor:'#3b82f618',borderWidth:2,tension:0.4,pointRadius:3,fill:true,spanGaps:true},
+          {label:'NO₂',data:td.no2,borderColor:'#10b981',backgroundColor:'#10b98118',borderWidth:2,tension:0.4,pointRadius:3,fill:true,spanGaps:true},
+          {label:'CO',data:td.co,borderColor:'#f59e0b',backgroundColor:'#f59e0b18',borderWidth:2,tension:0.4,pointRadius:3,fill:true,spanGaps:true}
+        ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{font:{size:10},color:'#64748b'}}},scales:{x:{ticks:{color:'#94a3b8',font:{size:9}}},y:{ticks:{color:'#94a3b8',font:{size:9}},title:{display:true,text:'mol/m²',font:{size:9},color:'#94a3b8'}}}}});
+        const dctx=document.getElementById('trDonutChart').getContext('2d');
+        new Chart(dctx,{type:'doughnut',data:{labels:['CH₄','NO₂','CO'],datasets:[{data:[${donutCh4},${donutNo2},${donutCo}],backgroundColor:['#3b82f6','#10b981','#f59e0b'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'62%',plugins:{legend:{position:'bottom',labels:{font:{size:9},color:'#64748b',boxWidth:10,padding:8}}}}});
+      })();
+    <\/script>`;
     const html = this.buildReportPage(ctx.title, `Emission transect profile · ${ctx.mLabel} · Year: ${ctx.year} · ${date}`, body, scripts, logoBase64);
-    const win = window.open('','_blank','width=980,height=920');
+    const win = window.open('','_blank','width=980,height=1050');
     if (!win) return;
     win.document.write(html);
     win.document.close();
@@ -4268,6 +4388,22 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
     const areaKm2 = ctx.areaKm2 != null ? ctx.areaKm2 : 'N/A';
     const source = ctx.source || 'Drawn area';
     const polyCoords = ctx.polygonCoords || ctx.drawnCoords || [];
+
+    // Pre-compute year trend using LGA zone stats per year
+    const years = this.state.availableYears;
+    const trendData = { ch4:[], no2:[], co:[] };
+    for (const yr of years) {
+      try {
+        const s = this.computeLGAZoneStats(polyCoords, parseInt(yr));
+        trendData.ch4.push(s.ch4?.mean ?? null);
+        trendData.no2.push(s.no2?.mean ?? null);
+        trendData.co.push(s.co?.mean   ?? null);
+      } catch { trendData.ch4.push(null); trendData.no2.push(null); trendData.co.push(null); }
+    }
+    const donutCh4 = ctx.stats.ch4?.mean || 0;
+    const donutNo2 = ctx.stats.no2?.mean || 0;
+    const donutCo  = ctx.stats.co?.mean  || 0;
+
     const [logoBase64, mapImg] = await Promise.all([
       this._loadLogoBase64(),
       polyCoords.length >= 3
@@ -4291,10 +4427,34 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
       ${mapImg ? `<div class="report-map"><img src="${mapImg}" alt="Digitized area"/></div>` : ''}
       <table><thead><tr><th>Metric</th><th>Mean</th><th>Min</th><th>Max</th><th>Std Dev</th></tr></thead><tbody>${rows}</tbody></table>
       <div class="note"><strong>LGAs included:</strong> ${lgas}</div>
-      ${detailRows ? `<div class="note"><strong>LGA detail values:</strong></div><table><thead><tr><th>LGA</th><th>CH₄</th><th>NO₂</th><th>CO</th><th>ISI</th></tr></thead><tbody>${detailRows}</tbody></table>` : ''}
+      <div style="margin-top:18px;font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Year-over-Year Gas Trend (Zone Mean)</div>
+      <div class="chart-wrap" style="height:240px"><canvas id="znTrendChart"></canvas></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:18px;align-items:center">
+        <div>
+          <div style="font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Gas Composition (${ctx.year})</div>
+          <div class="chart-wrap" style="height:180px"><canvas id="znDonutChart"></canvas></div>
+        </div>
+        <div>
+          ${detailRows ? `<div style="font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px">LGA Detail Values</div><table style="font-size:9px"><thead><tr><th>LGA</th><th>CH₄</th><th>NO₂</th><th>CO</th><th>ISI</th></tr></thead><tbody>${detailRows}</tbody></table>` : ''}
+        </div>
+      </div>
     `;
-    const html = this.buildReportPage(ctx.title, `Zone statistics · Year: ${ctx.year} · ${date}`, body, '', logoBase64);
-    const win = window.open('','_blank','width=980,height=900');
+    const scripts = `<script>
+      (function(){
+        const yrs=${JSON.stringify(years)};
+        const td=${JSON.stringify(trendData)};
+        const tctx=document.getElementById('znTrendChart').getContext('2d');
+        new Chart(tctx,{type:'line',data:{labels:yrs,datasets:[
+          {label:'CH₄',data:td.ch4,borderColor:'#3b82f6',backgroundColor:'#3b82f618',borderWidth:2,tension:0.4,pointRadius:3,fill:true,spanGaps:true},
+          {label:'NO₂',data:td.no2,borderColor:'#10b981',backgroundColor:'#10b98118',borderWidth:2,tension:0.4,pointRadius:3,fill:true,spanGaps:true},
+          {label:'CO',data:td.co,borderColor:'#f59e0b',backgroundColor:'#f59e0b18',borderWidth:2,tension:0.4,pointRadius:3,fill:true,spanGaps:true}
+        ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{font:{size:10},color:'#64748b'}}},scales:{x:{ticks:{color:'#94a3b8',font:{size:9}}},y:{ticks:{color:'#94a3b8',font:{size:9}},title:{display:true,text:'mol/m²',font:{size:9},color:'#94a3b8'}}}}});
+        const dctx=document.getElementById('znDonutChart').getContext('2d');
+        new Chart(dctx,{type:'doughnut',data:{labels:['CH₄','NO₂','CO'],datasets:[{data:[${donutCh4},${donutNo2},${donutCo}],backgroundColor:['#3b82f6','#10b981','#f59e0b'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'62%',plugins:{legend:{position:'bottom',labels:{font:{size:9},color:'#64748b',boxWidth:10,padding:8}}}}});
+      })();
+    <\/script>`;
+    const html = this.buildReportPage(ctx.title, `Zone statistics · Year: ${ctx.year} · ${date}`, body, scripts, logoBase64);
+    const win = window.open('','_blank','width=980,height=1050');
     if (!win) return;
     win.document.write(html);
     win.document.close();
@@ -4492,7 +4652,6 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
           <span class="sa-badge ${risk.css}" style="font-size:8px">${risk.label}</span>
         </div>
       `);
-      this.renderDrawMiniCharts('point', ctx);
     } catch(err) {
       this.showDrawResults('Point Analysis',
         `<div style="color:var(--red);font-size:11px;padding:6px 0">${err.message}</div>`);
@@ -4694,7 +4853,6 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
     // newly-shown drawTransectWrap, causing clientHeight to read as 0 and the
     // dimension-check loop inside renderTransectChart to spin forever.
     setTimeout(renderTransectChart, 0);
-    this.renderDrawMiniCharts('transect', this.state.currentDrawContext);
   },
 
   // ── Zone ─────────────────────────────────────────────────────
@@ -4784,7 +4942,6 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
         </table>
         ${lgaNote}
       `);
-      this.renderDrawMiniCharts('zone', zoneCtx);
     } catch(err) {
       this.showDrawResults('Zone Analysis',
         `<div style="color:var(--red);font-size:11px;padding:6px 0">${err.message}</div>`);
@@ -4945,158 +5102,17 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
     });
   },
 
-  async renderDrawMiniCharts(type, context) {
-    const miniWrap = document.getElementById('drawMiniChartsWrap');
-    const trendCanvas = document.getElementById('drawTrendChart');
-    const donutCanvas = document.getElementById('drawDonutChart');
-    if (!miniWrap || !trendCanvas || !donutCanvas) return;
-
-    if (this.charts.drawTrend) { this.charts.drawTrend.destroy(); this.charts.drawTrend = null; }
-    if (this.charts.drawDonut) { this.charts.drawDonut.destroy(); this.charts.drawDonut = null; }
-    miniWrap.style.display = 'block';
-
-    const years  = this.state.availableYears;
-    const GAS_COLORS = { ch4: '#3b82f6', no2: '#10b981', co: '#f59e0b' };
-    const GAS_LABELS = { ch4: 'CH₄',    no2: 'NO₂',    co: 'CO'  };
-
-    const makeChartOptions = () => ({
-      responsive: true, maintainAspectRatio: false, animation: false,
-      plugins: { legend: { labels: { font:{size:9}, color:'#7a8fa8', boxWidth:10, padding:6 } } },
-      scales: {
-        x: { ticks:{font:{size:8}, color:'#7a8fa8', maxRotation:0}, grid:{color:'rgba(255,255,255,0.04)'} },
-        y: { ticks:{font:{size:8}, color:'#7a8fa8'}, grid:{color:'rgba(255,255,255,0.04)'} },
-      },
-    });
-
-    const makeTrendDatasets = (data) =>
-      ['ch4','no2','co'].map(g => ({
-        label: GAS_LABELS[g],
-        data: data[g],
-        borderColor: GAS_COLORS[g], backgroundColor: GAS_COLORS[g] + '18',
-        borderWidth: 1.5, tension: 0.4, pointRadius: 2, fill: true, spanGaps: true,
-      }));
-
-    const makeDonut = (ch4, no2, co) => {
-      if (this.charts.drawDonut) { this.charts.drawDonut.destroy(); this.charts.drawDonut = null; }
-      this.charts.drawDonut = new Chart(donutCanvas, {
-        type: 'doughnut',
-        data: {
-          labels: ['CH₄', 'NO₂', 'CO'],
-          datasets: [{ data: [ch4, no2, co], backgroundColor: ['#3b82f6','#10b981','#f59e0b'], borderWidth: 0 }],
-        },
-        options: {
-          responsive: true, maintainAspectRatio: false, animation: false, cutout: '60%',
-          plugins: { legend: { position:'right', labels:{font:{size:9}, color:'#7a8fa8', boxWidth:10, padding:6} } },
-        },
-      });
-    };
-
-    const readPixel = (gr, lat, lng) => {
-      if (!gr) return null;
-      const col = Math.floor((lng - gr.xmin) / gr.pixelWidth);
-      const row = Math.floor((gr.ymax - lat) / gr.pixelHeight);
-      if (row < 0 || row >= gr.height || col < 0 || col >= gr.width) return null;
-      const ch4Raw = gr.values[0]?.[row]?.[col];
-      const no2Raw = gr.values[1]?.[row]?.[col];
-      const coRaw  = gr.values[2]?.[row]?.[col];
-      const ok = v => v != null && !isNaN(v) && v > -9000;
-      return {
-        ch4: ok(ch4Raw) ? Math.max(0, ch4Raw * this.CH4_PPB_TO_MOL) : null,
-        no2: ok(no2Raw) ? Math.max(0, no2Raw) : null,
-        co:  ok(coRaw)  ? Math.max(0, coRaw)  : null,
-      };
-    };
-
-    if (type === 'point') {
-      const { lat, lng, vals } = context;
-      const trendData = { ch4:[], no2:[], co:[] };
-      for (const yr of years) {
-        const gr = await this.loadRaster(yr);
-        const px = readPixel(gr, lat, lng);
-        trendData.ch4.push(px?.ch4 ?? null);
-        trendData.no2.push(px?.no2 ?? null);
-        trendData.co.push(px?.co  ?? null);
-      }
-      this.charts.drawTrend = new Chart(trendCanvas, {
-        type: 'line',
-        data: { labels: years, datasets: makeTrendDatasets(trendData) },
-        options: makeChartOptions(),
-      });
-      makeDonut(vals.ch4 || 0, vals.no2 || 0, vals.co || 0);
-
-    } else if (type === 'zone') {
-      const { polygonCoords, stats } = context;
-      const trendData = { ch4:[], no2:[], co:[] };
-      for (const yr of years) {
-        try {
-          const s = this.computeLGAZoneStats(polygonCoords, parseInt(yr));
-          trendData.ch4.push(s.ch4?.mean ?? null);
-          trendData.no2.push(s.no2?.mean ?? null);
-          trendData.co.push(s.co?.mean  ?? null);
-        } catch { trendData.ch4.push(null); trendData.no2.push(null); trendData.co.push(null); }
-      }
-      this.charts.drawTrend = new Chart(trendCanvas, {
-        type: 'line',
-        data: { labels: years, datasets: makeTrendDatasets(trendData) },
-        options: makeChartOptions(),
-      });
-      makeDonut(stats.ch4?.mean || 0, stats.no2?.mean || 0, stats.co?.mean || 0);
-
-    } else if (type === 'transect') {
-      const { latlngs } = context;
-      const samples = this.samplePolyline(latlngs, 12);
-      const trendData = { ch4:[], no2:[], co:[] };
-      for (const yr of years) {
-        const gr = await this.loadRaster(yr);
-        const sums = {ch4:0,no2:0,co:0}, counts = {ch4:0,no2:0,co:0};
-        samples.forEach(s => {
-          const px = readPixel(gr, s.latlng.lat, s.latlng.lng);
-          if (!px) return;
-          if (px.ch4 != null) { sums.ch4 += px.ch4; counts.ch4++; }
-          if (px.no2 != null) { sums.no2 += px.no2; counts.no2++; }
-          if (px.co  != null) { sums.co  += px.co;  counts.co++;  }
-        });
-        trendData.ch4.push(counts.ch4 ? sums.ch4/counts.ch4 : null);
-        trendData.no2.push(counts.no2 ? sums.no2/counts.no2 : null);
-        trendData.co.push(counts.co  ? sums.co /counts.co  : null);
-      }
-      this.charts.drawTrend = new Chart(trendCanvas, {
-        type: 'line',
-        data: { labels: years, datasets: makeTrendDatasets(trendData) },
-        options: makeChartOptions(),
-      });
-      // Donut from current year mean along path
-      const grNow = await this.loadRaster(this.state.currentYear);
-      let ch4s=0,no2s=0,cos=0,n=0;
-      samples.forEach(s => {
-        const px = readPixel(grNow, s.latlng.lat, s.latlng.lng);
-        if (!px) return;
-        if (px.ch4 != null) ch4s += px.ch4;
-        if (px.no2 != null) no2s += px.no2;
-        if (px.co  != null) cos  += px.co;
-        n++;
-      });
-      makeDonut(n ? ch4s/n : 0, n ? no2s/n : 0, n ? cos/n : 0);
-    }
-  },
-
   showDrawResults(title, html, keepChart = false) {
     const section      = document.getElementById('drawResultsSection');
     const titleEl      = document.getElementById('drawResultsTitle');
     const contentEl    = document.getElementById('drawResultsContent');
     const transectWrap = document.getElementById('drawTransectWrap');
-    const miniWrap     = document.getElementById('drawMiniChartsWrap');
     if (!section) return;
     if (titleEl)   titleEl.textContent = title;
     if (contentEl) contentEl.innerHTML = html;
     if (!keepChart && transectWrap) {
       transectWrap.style.display = 'none';
       if (this.charts.transect) { this.charts.transect.destroy(); this.charts.transect = null; }
-    }
-    if (!keepChart) {
-      if (miniWrap) miniWrap.style.display = 'none';
-      if (this.charts.drawTrend) { this.charts.drawTrend.destroy(); this.charts.drawTrend = null; }
-      if (this.charts.drawDonut) { this.charts.drawDonut.destroy(); this.charts.drawDonut = null; }
     }
     section.style.display = 'block';
   },
@@ -5111,11 +5127,7 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
     document.querySelectorAll('.draw-btn').forEach(b => b.classList.remove('active'));
     const section = document.getElementById('drawResultsSection');
     if (section) section.style.display = 'none';
-    const miniWrap = document.getElementById('drawMiniChartsWrap');
-    if (miniWrap) miniWrap.style.display = 'none';
     if (this.charts.transect) { this.charts.transect.destroy(); this.charts.transect = null; }
-    if (this.charts.drawTrend) { this.charts.drawTrend.destroy(); this.charts.drawTrend = null; }
-    if (this.charts.drawDonut) { this.charts.drawDonut.destroy(); this.charts.drawDonut = null; }
     if (this._profileCursor) { this.map.removeLayer(this._profileCursor); this._profileCursor = null; }
     this._profileCursorSamples = null;
   },

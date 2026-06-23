@@ -278,9 +278,6 @@ html, body { height:100%; font-family:'Inter',sans-serif; background:var(--bg); 
 .leaflet-bar a { background:var(--surface) !important; border-color:var(--border) !important; color:var(--t1) !important; }
 .leaflet-bar a:hover { background:var(--surface-2) !important; color:var(--accent) !important; }
 
-/* ── Draw mini-charts ── */
-.draw-mini-section-title { font-size:9px; font-weight:700; color:var(--t3); text-transform:uppercase; letter-spacing:.7px; margin-bottom:4px; }
-
 /* ── Scrollbars ── */
 ::-webkit-scrollbar { width:4px; height:4px; }
 ::-webkit-scrollbar-track { background:transparent; }
