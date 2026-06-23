@@ -76,9 +76,12 @@
   --select-arrow: '%23524d6e';
 }
 
-html, body { height:100%; font-family:'Inter',sans-serif; background:var(--bg); color:var(--t1); overflow:hidden; }
+html { height:100%; overflow:hidden; }
+body { height:100%; font-family:'Inter',sans-serif; background:var(--bg); color:var(--t1); overflow:hidden; display:flex; flex-direction:column; }
 
-.app-shell { display:flex; height:100vh; width:100vw; overflow:hidden; }
+/* height:100% follows the html→body chain so all three share the same reference,
+   avoiding the sub-pixel gap that 100vh can produce at non-integer DPR on Windows. */
+.app-shell { display:flex; flex:1; min-height:0; width:100%; overflow:hidden; }
 
 /* ── Sidebar ── */
 .sidebar {
@@ -255,7 +258,7 @@ html, body { height:100%; font-family:'Inter',sans-serif; background:var(--bg); 
 .prox-icon { font-size:16px; flex-shrink:0; }
 
 /* ── Bottom Charts ── */
-.bottom-row { flex-shrink:0; background:var(--surface); border-top:1px solid var(--border); height:var(--charts-h); }
+.bottom-row { flex-shrink:0; background:var(--surface); border-top:1px solid var(--border); height:var(--charts-h); overflow:hidden; }
 .charts-row { display:grid; grid-template-columns:repeat(3,1fr); height:100%; }
 .chart-card { display:flex; flex-direction:column; border-right:1px solid var(--border); overflow:hidden; }
 .chart-card:last-child { border-right:none; }
@@ -382,9 +385,11 @@ html, body { height:100%; font-family:'Inter',sans-serif; background:var(--bg); 
 
   html, body { overflow: hidden; height: 100%; }
 
+  /* On mobile, override the flex:1 sizing with the JS-measured real viewport height
+     to handle iOS Safari's dynamic browser-chrome shrink/grow. */
   .app-shell {
-    height: 100vh;                        /* base fallback */
-    height: var(--app-height, 100dvh);    /* JS-set real vh, falls back to dvh */
+    flex: none;
+    height: var(--app-height, 100dvh);
   }
 
   /* ── Sidebar: hidden overlay drawer from left ── */
