@@ -38,6 +38,14 @@
       <li class="nav-item" id="adminNavItem" data-section="admin" style="display:none"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span><span class="nav-label" style="color:#f97316">Admin</span></li>
     </ul>
 
+    <div id="sidebarAdminLogin" style="padding:10px 14px;border-top:1px solid var(--border);margin-top:auto">
+      <button onclick="app.showLoginModal()" title="Admin login"
+        style="width:100%;display:flex;align-items:center;justify-content:center;gap:7px;background:rgba(249,115,22,0.1);border:1px solid rgba(249,115,22,0.28);color:#f97316;border-radius:8px;padding:8px 10px;font-size:11px;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:.5px">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Admin Login
+      </button>
+    </div>
+
     <!-- User pill at bottom of sidebar (shown when logged in via backend) -->
     <div id="sidebarUser" style="display:none;padding:10px 14px;border-top:1px solid var(--border);margin-top:auto">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">

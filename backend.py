@@ -11,8 +11,8 @@ Endpoints
 ---------
 POST /api/auth/login                        — obtain token
 GET  /api/auth/me                           — current user (auth)
-GET  /api/emissions                         — lga_emissions.geojson  (auth)
-GET  /api/landfills                         — landfills.geojson      (auth)
+GET  /api/emissions                         — lga_emissions.geojson  (public)
+GET  /api/landfills                         — landfills.geojson      (public)
 POST /api/admin/emissions/upload            — CSV → update emissions  (admin)
 POST /api/admin/landfills/upload            — GeoJSON → replace landfills (admin)
 GET  /api/admin/vectors/<name>              — download current vector GeoJSON (admin)
@@ -388,10 +388,9 @@ def login():
 def me():
     return jsonify({'username': g.user['u'], 'role': g.user['r']})
 
-# ── Data API (viewer + admin) ──────────────────────────────────────────────────
+# ── Public Data API ────────────────────────────────────────────────────────────
 
 @app.route('/api/emissions')
-@require_auth
 def get_emissions():
     db = get_db()
     gj = _build_emissions_geojson(db)
@@ -399,7 +398,6 @@ def get_emissions():
     return jsonify(gj)
 
 @app.route('/api/landfills')
-@require_auth
 def get_landfills():
     db = get_db()
     gj = _build_landfills_geojson(db)

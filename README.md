@@ -29,7 +29,7 @@ npm run prepare-data
 
 If you want to keep using Python instead, `prepare_dashboard_data.py`, `convert_csvs.py`, and `convert_landfills.py` still work and produce the same output files in `data/`.
 
-3. Start the backend API (auth, uploads, admin):
+3. Start the backend API (public data, admin login, uploads):
 
 ```powershell
 python backend.py
@@ -59,7 +59,7 @@ python -m http.server 8000
 http://localhost:8000/index.html
 ```
 
-Log in with the default admin credentials (`admin` / `admin123`) and change the password immediately via the admin panel.
+Public users can view the dashboard immediately. Admin users can select Admin Login, sign in with the default credentials (`admin` / `admin123`), and should change the password immediately via the admin panel.
 
 ## Notes
 

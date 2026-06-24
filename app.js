@@ -279,11 +279,11 @@ const app = {
     this.initChartDefaults();
     this.setTheme(localStorage.getItem('erm-theme') || 'dark');
     this.setAvailableYears(this.getYears());
-    // Check if backend is available; if so require login before loading data
+    // Check if backend is available and restore an admin session when present.
+    // Public dashboard viewing does not require a login.
     const backendUp = await this.checkBackend();
     if (backendUp) {
-      const authed = await this.restoreSession();
-      if (!authed) { this.showLoginModal(); return; }
+      await this.restoreSession();
     }
     await this.loadData();
     this.initializeMap();
@@ -305,6 +305,17 @@ const app = {
     try {
       const authHeaders = this.state.authToken
         ? { 'Authorization': `Bearer ${this.state.authToken}` } : {};
+      const loadStaticDashboardData = async () => {
+        const [emResp, lfResp] = await Promise.all([
+          fetch('data/lga_emissions.geojson'),
+          fetch('data/landfills.geojson'),
+        ]);
+        if (!emResp.ok || !lfResp.ok) throw new Error('Static dashboard data is unavailable');
+        this.state.data.lgas = await emResp.json();
+        const lf = await lfResp.json();
+        this.state.data.emissionPoints = lf;
+        this.state.data.landfills      = lf;
+      };
 
       // Boundary and places are always loaded from static files (no sensitive data)
       const [lgasBoundaryResponse, placesResponse] = await Promise.all([
@@ -316,26 +327,23 @@ const app = {
 
       // Emissions + landfills: use API if backend is active, else static files
       if (this.state.backendMode) {
-        const [emResp, lfResp] = await Promise.all([
-          fetch(`${this.state.BACKEND_URL}/api/emissions`,  { headers: authHeaders }),
-          fetch(`${this.state.BACKEND_URL}/api/landfills`,  { headers: authHeaders }),
-        ]);
-        if (emResp.status === 401 || lfResp.status === 401) {
-          this.showLoginModal(); return;
+        try {
+          const [emResp, lfResp] = await Promise.all([
+            fetch(`${this.state.BACKEND_URL}/api/emissions`,  { headers: authHeaders }),
+            fetch(`${this.state.BACKEND_URL}/api/landfills`,  { headers: authHeaders }),
+          ]);
+          if (!emResp.ok || !lfResp.ok) throw new Error(`Backend data unavailable (${emResp.status}/${lfResp.status})`);
+          this.state.data.lgas = await emResp.json();
+          const lf = await lfResp.json();
+          this.state.data.emissionPoints = lf;
+          this.state.data.landfills      = lf;
+        } catch (apiError) {
+          console.warn('Backend data failed; using static GeoJSON fallback:', apiError);
+          this.state.backendMode = false;
+          await loadStaticDashboardData();
         }
-        this.state.data.lgas = await emResp.json();
-        const lf = await lfResp.json();
-        this.state.data.emissionPoints = lf;
-        this.state.data.landfills      = lf;
       } else {
-        const [emResp, lfResp] = await Promise.all([
-          fetch('data/lga_emissions.geojson'),
-          fetch('data/landfills.geojson'),
-        ]);
-        this.state.data.lgas = await emResp.json();
-        const lf = await lfResp.json();
-        this.state.data.emissionPoints = lf;
-        this.state.data.landfills      = lf;
+        await loadStaticDashboardData();
       }
 
       this.populateLGASelector();
@@ -5232,6 +5240,8 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
     // Show admin nav item only for admins
     const adminNav = document.getElementById('adminNavItem');
     if (adminNav) adminNav.style.display = role === 'admin' ? 'flex' : 'none';
+    const adminLogin = document.getElementById('sidebarAdminLogin');
+    if (adminLogin) adminLogin.style.display = 'none';
   },
 
   showLoginModal() {
@@ -5270,6 +5280,12 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
       }
       this._applySession(data.token, data.username, data.role);
       this.hideLoginModal();
+      if (this.map) {
+        await this.loadData();
+        this.updateDashboard();
+        if (data.role === 'admin') this.openAdminPanel();
+        return;
+      }
       // Continue app init from where we left off
       await this.loadData();
       this.initializeMap();
@@ -5298,8 +5314,10 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
     if (pill) pill.style.display = 'none';
     const adminNav = document.getElementById('adminNavItem');
     if (adminNav) adminNav.style.display = 'none';
+    const adminLogin = document.getElementById('sidebarAdminLogin');
+    if (adminLogin) adminLogin.style.display = 'block';
     this.closeAdminPanel();
-    this.showLoginModal();
+    this.showNotification('Signed out of admin mode');
   },
 
   // ── Change password ──────────────────────────────────────────────────────────
@@ -5424,6 +5442,10 @@ ${pt.hot>0.5?`<div style="margin-top:8px;background:#dc262618;border:1px solid #
   },
 
   openAdminPanel() {
+    if (this.state.authRole !== 'admin') {
+      this.showLoginModal();
+      return;
+    }
     document.getElementById('adminPanel')?.classList.add('open');
     this.updateLegendVisibility();
     this.loadAdminUsers();

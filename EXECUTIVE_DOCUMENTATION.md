@@ -11,7 +11,7 @@ The dashboard supports executive review through:
 - comparative gas correlation analysis,
 - buffer exposure assessment,
 - LGA-level performance ranking, and
-- authenticated access with an admin panel for data updates and user management.
+- free public dashboard access with admin-only login for data updates and user management.
 
 This document summarizes the project purpose, data sources, functionality, operating workflow, and recommended next steps.
 
@@ -77,6 +77,8 @@ The core dashboard map enables user interactions with:
 - LGA filtering,
 - search by location or LGA.
 
+A collapsible map legend is displayed on the main map view with a toggle button (▾/▸) to expand or collapse it. The legend auto-collapses on mobile viewports and hides entirely when the Spatial Analysis, Gas Emissions, Landfills, or Admin panels are open, keeping the map surface unobstructed during detailed analysis.
+
 ### 2. Emission Metric Controls
 
 Users can select and compare:
@@ -117,6 +119,12 @@ A dedicated analysis panel becomes available when users draw or select spatial c
 - visual transect charts,
 - report generation controls.
 
+Each generated report popup now includes embedded analytics charts rendered directly inside the report:
+- a year-over-year trend line chart showing emission values across the available time series,
+- a gas composition donut chart breaking down CH₄, NO₂, and CO contributions for the selected location.
+
+These charts appear in Point, Transect, and Zone reports and are included when the report is downloaded as HTML or saved as PDF.
+
 ### 6. Trend Analysis
 
 Trend analysis modules include:
@@ -143,12 +151,12 @@ The spatial analysis panel supports:
 - zonal classification,
 - overlay analysis of emission and landfill data.
 
-### 9. Authentication and Admin Panel
+### 9. Public Access and Admin Panel
 
-Access to the dashboard's data is gated by a login modal backed by `backend.py`:
-- Username/password login issues a signed token (default credentials `admin` / `admin123`, which should be changed after first login).
-- All users can view emissions/landfills data and change their own password.
-- Admin users additionally get an admin panel to:
+Dashboard viewing is open to users without login. Authentication is only required for administrators through the login modal backed by `backend.py`:
+- Username/password admin login issues a signed token (default credentials `admin` / `admin123`, which should be changed after first login).
+- Public users can view emissions, landfills, maps, analytics, and reports without an account.
+- Admin users get an admin panel to:
   - upload a CSV to update emissions data,
   - upload GeoJSON to replace the landfills layer or the places/settlement labels layer,
   - download the current version of any of the above vector files,
@@ -159,20 +167,23 @@ Access to the dashboard's data is gated by a login modal backed by `backend.py`:
 On narrow viewports, the dashboard switches to a mobile-optimized layout:
 - a collapsible sidebar opened via a hamburger menu,
 - a bottom navigation bar for switching between Home, Spatial, Gas, Landfills, and Stats,
-- the right-hand info panel becomes a toggleable bottom sheet over the map.
+- the right-hand info panel becomes a toggleable bottom sheet over the map,
+- analytics charts are presented as a horizontal snap-scroll carousel: each chart card fills the full viewport width and advances by swipe gesture,
+- the map legend auto-collapses on load to preserve map screen space,
+- a narrow-tablet breakpoint (641–768 px) applies compact chart header sizing for intermediate screen sizes.
 
 ## User Workflow
 
 1. Start the backend (`backend.py`) and, optionally, the GEE proxy (`server.py`).
 2. Start a local static server in the dashboard folder and open `index.html` in the browser.
-3. Log in (default `admin` / `admin123`, or a provisioned user account).
+3. Open the dashboard; no login is required for normal viewing.
 4. Select the year and emission metric to review.
 5. Toggle map layers and basemaps to inspect spatial patterns.
 6. Use the LGA selector or search box for targeted review.
 7. Open the spatial analysis panel for ranking, trending, and anomaly review.
 8. Open the gas panel to compare gas pairs and observe temporal behavior.
 9. Draw a point / transect / zone or click an LGA to generate reports.
-10. Admin users can open the admin panel to refresh data or manage accounts.
+10. Admin users can sign in through Admin Login to refresh data or manage accounts.
 
 ## Deployment Instructions
 
@@ -221,11 +232,12 @@ python -m http.server 8000
 ### Open in Browser
 
 - `http://localhost:8000/index.html`
-- Log in with the default admin credentials (`admin` / `admin123`) and change the password from the admin panel.
+- Public users can view the dashboard immediately.
+- Admin users can sign in with the default admin credentials (`admin` / `admin123`) and should change the password from the admin panel.
 
 ## Technical Notes
 
-- The dashboard loads emissions/landfills data and authenticates through `backend.py` (port 5002), and optionally fetches live raster tiles and trend details through `server.py` (port 5001).
+- The dashboard loads public emissions/landfills data through `backend.py` (port 5002); authentication is used only for admin functions. It optionally fetches live raster tiles and trend details through `server.py` (port 5001).
 - `index.html` is the single, comprehensive application; the previously included `dashboard.html` legacy view has been removed.
 - The application is built with Leaflet for GIS mapping and Chart.js for analytics.
 - `dashboard.db` (SQLite) stores user accounts and tokens; it is created automatically on first run of `backend.py` and is not tracked in source control.
